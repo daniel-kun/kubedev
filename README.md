@@ -71,7 +71,7 @@ Creates a helm-chart (with Deployment/DaemonSet/CronJob and optionally Services)
 
 In contrast to the `kubedev mk …`-commands, it does not print the files to stdout, but writes them directly, if they do not exist. Otherwise, a warning is printed for each file and the existing file is not modified.
 
-## kubedev generate helm-chart <template>
+## kubedev generate helm-chart \<template\>
 
 *NOT IMPLEMENTED, YET*
 
@@ -81,7 +81,7 @@ Creates a helm-chart for this service, according to kubedev.json, consisting of:
 - A deployment, daemonset or a cronjob, depending on "type".
 - For deployments and daemonsets: Adds a Service (type ClusterIP).
 
-## kubedev generate Tiltfile <template>
+## kubedev generate Tiltfile \<template\>
 
 *NOT IMPLEMENTED, YET*
 
@@ -128,13 +128,13 @@ The --clean switch runs `tilt down` before running tilt up.
 
 Runs `tilt down`.
 
-## kubedev test-ci <job>
+## kubedev test-ci \<job\>
 
 *NOT IMPLEMENTED, YET*
 
 Creates a temporary branch, commits all local changes and uncommited files to this branch, then runs `gitlab-runner exec shell <job>` and then restores the previous git state.
 
-## kubedev build <subdir>
+## kubedev build \<subdir\>
 
 *NOT IMPLEMENTED, YET*
 
@@ -144,7 +144,7 @@ The docker image name is deducted from the git repository name, thus this comman
 
 Is used inside the CI/CD build jobs.
 
-## kubedev push <subdir>
+## kubedev push \<subdir\>
 
 *NOT IMPLEMENTED, YET*
 
