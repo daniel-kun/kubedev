@@ -1,0 +1,18 @@
+{
+  "deployments": {
+    "testdeploy": {
+      "ports": {
+        "5001": "8081",
+        "5000": null
+      },
+      "required-envs": {
+        "TESTDEPLOY_ENV1": {
+          "documentation": "Test env var #1"
+        },
+        "TESTDEPLOY_ENV2": {
+          "documentation": "Test env var #2"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+from .generate_tests import KubeDevGenerateBasicTests
