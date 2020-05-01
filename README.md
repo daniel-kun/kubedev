@@ -10,7 +10,14 @@ It builds on:
 - CI providers:
     - [GitLab](https://gitlab.com/)
 
-`kubedev` heavily relies on environment variables for service configuration
+## kubedev Principles
+
+- `kubedev` wants to help you quickly and easily build microservices that are independent, but at the same time follow a common pattern in regards to building, documenting and deploying. This makes it easier to add new services, and to onboard new developers.
+- `kubedev` aims to be a thin wrapper around the commands it builds on, and just wants to make it easier for teams to call them appropriately.
+- `kubedev` always prints the commands that it executes, so that you know what is going on.
+- `kubedev` heavily relies on environment variables for service configuration.
+
+## Current state of development
 
 `kubedev` is in early development. Currently, the following commands are implemented:
 
