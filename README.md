@@ -2,6 +2,16 @@
 
 DevOps command line tool that standardizes workflows for Microservices in Kubernetes for teams: Build, Develop, CI/CD.
 
+It builds on:
+
+- [docker](https://docker.com/)
+- [tilt](https://tilt.dev/)
+- [helm](https://helm.sh/)
+- CI providers:
+    - [GitLab](https://gitlab.com/)
+
+`kubedev` heavily relies on environment variables for service configuration
+
 `kubedev` is in early development. Currently, the following commands are implemented:
 
 - *None yet*
@@ -12,24 +22,19 @@ DevOps command line tool that standardizes workflows for Microservices in Kubern
 
 Schema of kubedev.json:
 
-```json
+```jsonc
 {
-    "name": "gcs-service-usagestats",
+    "name": "myservice",
     "ci-provider": "gitlab",
-    "tilt-version": "0.1.20",
-    "tilt-version.comment": "The exact tilt version that kubedev uses.",
+    "tilt-version": "0.1.20", # The exact tilt version that kubedev uses.
     "deployments": {
         "usagestats": {
-            "used-frameworks": ["python", "pipenv", "npm", "vue"],
-            "used-frameworks.comment": "used-frameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.",
-            "dev-only": true,
-            "dev-only.default": false,
-            "dev-only.comment": "Specifies whether this service must only be deployed on local development machines",
+            "used-frameworks": ["python", "pipenv", "npm", "vue"], # used-frameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.
+            "dev-only": true, # default: false. Specifies whether this service must only be deployed on local development machines
             "port": 5000,
-            "dev-port": 8081,
-            "dev-port.comment": "The port that tilt  up forwards",
+            "dev-port": 8081, # The port that tilt  up forwards
             "required-envs": {
-                "USAGESTATS_FLASK_ENV": {
+                "MYSERVICE_FLASK_ENV": {
                     "documentation": "...",
                     "encoding": "base64"
                 }
@@ -40,8 +45,8 @@ Schema of kubedev.json:
        …
     },
     "cronjobs": {
-        "usagestats-transfer": {
-            "comment": "Includes necessary definitions for CronJobs".
+        "mycronjob": {
+            … # Includes necessary definitions for CronJobs
         }
     }
 }
@@ -167,6 +172,6 @@ Is used inside the CI/CD build jobs.
 
 *NOT IMPLEMENTED, YET*
 
-Does, what currently `gcs-deploy -m template` does, but includes all env vars from kubedev.json.
+Basically runs `helm template` with appropriate arguments and env vars from `kubedev.json`.
 
 Is used inside the Tiltfile.
