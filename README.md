@@ -67,7 +67,7 @@ Creates:
 
 * Directories for each deployment, daemonset or cronjob
 * Empty Dockerfiles in these directories
-* A kubedev.json
+* A template kubedev.json
 * A README.md template
 
 ## kubedev generate [--overwrite]
@@ -75,8 +75,6 @@ Creates:
 *NOT IMPLEMENTED, YET*
 
 Creates a helm-chart (with Deployment/DaemonSet/CronJob and optionally Services), Tiltfile and .gitlab-ci.yml from the definitions in ./kubedev.json. If ./kubedev.json does not exist, instructions are printed (referencing the "kubedev init" command).
-
-In contrast to the `kubedev mk …`-commands, it does not print the files to stdout, but writes them directly, if they do not exist. Otherwise, a warning is printed for each file and the existing file is not modified.
 
 ## kubedev generate helm-chart \<template\>
 
