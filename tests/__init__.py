@@ -1,1 +1,1 @@
-from .generate_tests import KubeDevGenerateBasicTests
+from .generate_tests import KubeDevGenerateDeploymentTests
