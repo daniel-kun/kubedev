@@ -16,6 +16,9 @@ class FileMock:
     else:
       return False
 
+  def mkdirhier(self, path):
+    return None
+
 
 class EnvMock:
   def __init__(self):

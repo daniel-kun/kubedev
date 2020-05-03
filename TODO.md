@@ -1,0 +1,6 @@
+- kubedev generate ✔
+- kubedev check
+- kubedev build
+- kubedev push
+- kubedev template
+- kubedev deploy

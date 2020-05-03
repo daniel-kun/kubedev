@@ -8,7 +8,7 @@ It builds on:
 - [tilt](https://tilt.dev/)
 - [helm](https://helm.sh/)
 - CI providers:
-    - [GitLab](https://gitlab.com/)
+  - [GitLab](https://gitlab.com/)
 
 ## kubedev Principles
 
@@ -21,11 +21,13 @@ It builds on:
 
 `kubedev` is in early development. Currently, the following commands are implemented:
 
-- *None yet*
+- _None yet_
 
 ## Synopsis
 
 `kubedev` commands are based on the definitions found in `kubedev.json`, which include the minimum necessary information that is required to execute common cloud-dev related tasks.
+
+A kubedev.json describes an "App", which in turn can contain "Sub-Apps" that may be deployments, daemonsets or cronjobs.
 
 Schema of kubedev.json:
 
@@ -33,15 +35,14 @@ Schema of kubedev.json:
 {
     "name": "myservice",
     "ci-provider": "gitlab",
-    "tilt-version": "0.1.20", # The exact tilt version that kubedev uses.
     "deployments": {
-        "usagestats": {
+        "mydeploy": { # A Sub-App `mydeploy' of type deployment
             "used-frameworks": ["python", "pipenv", "npm", "vue"], # used-frameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.
             "dev-only": true, # default: false. Specifies whether this service must only be deployed on local development machines
             "port": 5000,
             "dev-port": 8081, # The port that tilt  up forwards
             "required-envs": {
-                "MYSERVICE_FLASK_ENV": {
+                "MYDEPLOY_FLASK_ENV": {
                     "documentation": "...",
                     "encoding": "base64"
                 }
@@ -52,33 +53,33 @@ Schema of kubedev.json:
        …
     },
     "cronjobs": {
-        "mycronjob": {
+        "mycronjob": {  # A Sub-App mycronjob of type cronjobs
             … # Includes necessary definitions for CronJobs
         }
     }
 }
 ```
 
-## kubedev init [<deployment:name>, …] [<cronjob:name>, …] [<daemonset:name>, …]
+## kubedev init [<deployment:name>, …][<cronjob:name>, …] [<daemonset:name>, …]
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Creates:
 
-* Directories for each deployment, daemonset or cronjob
-* Empty Dockerfiles in these directories
-* A template kubedev.json
-* A README.md template
+- Directories for each deployment, daemonset or cronjob
+- Empty Dockerfiles in these directories
+- A template kubedev.json
+- A README.md template
 
 ## kubedev generate [--overwrite]
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Creates a helm-chart (with Deployment/DaemonSet/CronJob and optionally Services), Tiltfile and .gitlab-ci.yml from the definitions in ./kubedev.json. If ./kubedev.json does not exist, instructions are printed (referencing the "kubedev init" command).
 
 ## kubedev generate helm-chart \<template\>
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Creates a helm-chart for this service, according to kubedev.json, consisting of:
 
@@ -88,15 +89,16 @@ Creates a helm-chart for this service, according to kubedev.json, consisting of:
 
 ## kubedev generate Tiltfile \<template\>
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Creates a Tiltfile with some sensible defaults.
 
 ## kubedev generate gitlab-ci
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Creates a .gitlab-ci.yml file containing the `build-push` and `deploy` states:
+
 - build-push: Runs `kubedev` build and then `kubedev push`
 - deploy: Runs `kubedev deploy`
 
@@ -104,22 +106,22 @@ It uses the latest stable dev-baseimage.
 
 ## kubedev check
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Reads kubedev.json and checks whether all environment variables from the configuration is set in the current environment. It prints missing variables, including it's documentation.
 
-For  used-frameworks "pipenv", it runs `bandit`.
+For used-frameworks "pipenv", it runs `bandit`.
 For used-frameworks "npm", it runs `npm audit`.
 
 ## kubedev print env-doc
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Prints out a Markdown table with all environment variables declared in kubedev.json and their documentation.
 
 ## kubedev up [--clean]
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Checks the current environment and runs `tilt up` when the configuration is OK.
 
@@ -129,19 +131,19 @@ The --clean switch runs `tilt down` before running tilt up.
 
 ## kubedev down
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Runs `tilt down`.
 
 ## kubedev test-ci \<job\>
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Creates a temporary branch, commits all local changes and uncommited files to this branch, then runs `gitlab-runner exec shell <job>` and then restores the previous git state.
 
-## kubedev build \<subdir\>
+## kubedev build \<sub-app\>
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Runs `docker build` with all docker build args as defined in kubedev.json and tags it with a temporary, unique development tag.
 
@@ -149,9 +151,9 @@ The docker image name is deducted from the git repository name, thus this comman
 
 Is used inside the CI/CD build jobs.
 
-## kubedev push \<subdir\>
+## kubedev push \<sub-app\>
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 When `kubedev build` has been run before, it runs `docker push` with the last successful build's unique development tag.
 
@@ -161,13 +163,13 @@ Is used inside the CI/CD build jobs.
 
 ## kubedev run-local [args…]
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Runs `kubedev build` and runs the new docker image with all envs set and ports forwarded, optionally with [args…].
 
 ## kubedev deploy
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Reads the `.kube/conf` from an environment variable, auto-increases the `helm-chart/Chart.yaml`'s version and then runs `helm install` with appropriate arguments and env vars from `kubedev.json`.
 
@@ -175,7 +177,7 @@ Is used inside the CI/CD build jobs.
 
 ## kubedev template
 
-*NOT IMPLEMENTED, YET*
+_NOT IMPLEMENTED, YET_
 
 Basically runs `helm template` with appropriate arguments and env vars from `kubedev.json`.
 

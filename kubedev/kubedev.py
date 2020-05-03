@@ -1,5 +1,6 @@
 import json
 import pathlib
+from io import StringIO
 from os import getenv, path
 
 import yaml
@@ -15,6 +16,9 @@ class RealFileAccessor:
     pathlib.Path(targetDir).mkdir(parents=True, exist_ok=True)
     with open(filename, 'w') as f:
       f.write(content)
+
+  def mkdirhier(self, path):
+    return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
 class RealEnvAccessor:
@@ -96,23 +100,40 @@ class Kubedev:
         'helm-chart', 'Chart.yaml'), _load_template(chartYamlTemplatePath, variables), overwrite)
 
     images = dict()  # Collect all images across deployments, cronjobs, etc.
+    portForwards = dict()  # Collect all port-forwards for deployments and daemonsets for tilt
 
+    print('⚓ Generating helm-chart...')
     if 'deployments' in kubedev:
-      deploymentImages = self.generate_deployments(
+      (deploymentImages, deploymentPortForwards) = self.generate_deployments(
           kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite)
       images.update(deploymentImages)
+      portForwards.update(deploymentPortForwards)
 
     self.generate_ci(images, kubedev, projectName, envs, variables,
                      imageRegistry, file_accessor, overwrite)
+
+    self.generate_tiltfile(images, portForwards, file_accessor, overwrite)
+
+    self.generate_projects(images, file_accessor)
 
     return True
 
   def generate_deployments(self, kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite):
     images = dict()  # Collect all images from deployments
+    portForwards = dict()  # Collect all port-forwads for tilt
     for deploymentName, value in kubedev['deployments'].items():
       finalDeploymentName = _build_final_name(projectName, deploymentName)
-      deployEnvs = value['required-envs'] if 'required-envs' in value else dict()
       ports = value['ports'] if 'ports' in value else dict()
+      servicePorts = [
+          port for (portName, port) in ports.items() if 'service' in port and 'container' in port]
+      print(f'    🔱 Writing deployment {finalDeploymentName}' +
+            ' (with service)' if len(servicePorts) > 0 else '')
+      deployEnvs = value['required-envs'] if 'required-envs' in value else dict()
+      portForwards[deploymentName] = [
+          {'dev': port['dev'], 'service': port['service']}
+          for portName, port in ports.items()
+          if 'dev' in port and 'service' in port
+      ]
       replicas = int(value['replicas']) if 'replicas' in value else 2
       deployVars = {
           'KUBEDEV.DEPLOYMENT_NAME': finalDeploymentName,
@@ -178,10 +199,10 @@ class Kubedev:
             'helm-chart', 'templates', 'deployments', deploymentName + '_service.yaml')
         file_accessor.save_file(
             serviceYamlPath, yaml.safe_dump(service), overwrite)
-    return images
+    return (images, portForwards)
 
   def generate_ci(self, images, kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite):
-    print(images)
+    print('🖥 Generating .gitlab-ci.yml...')
     oldCi = dict()
     try:
       with open('.gitlab-ci.yml', 'r') as f:
@@ -227,3 +248,28 @@ class Kubedev:
           }
       }
     file_accessor.save_file('.gitlab-ci.yml', yaml.safe_dump(oldCi), overwrite)
+
+  def generate_tiltfile(self, images, portForwards, file_accessor, overwrite):
+    print('💫 Generating Tiltfile...')
+    tiltfile = StringIO()
+    for imageKey, image in images.items():
+      tiltfile.write(f"docker_build('{image['image']}', '{imageKey}')\n")
+    tiltfile.write('\n')
+
+    tiltfile.write("k8s_yaml(local('kubedev template'))\n")
+    tiltfile.write('\n')
+
+    for portKey, portForward in portForwards.items():
+      portForwardStr = ",".join(
+          [f"'{p['dev']}:{p['service']}'" for p in portForward])
+      tiltfile.write(
+          f"k8s_resource('{portKey}', port_forwards=[{portForwardStr}])\n")
+
+    file_accessor.save_file('Tiltfile', tiltfile.getvalue(), overwrite)
+
+  def generate_projects(self, images, file_accessor):
+    for imageKey in images.keys():
+      print(f'🐳 Generating {imageKey}/Dockerfile...')
+      file_accessor.mkdirhier(imageKey)
+      dockerfile = f'{imageKey}/Dockerfile'
+      file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
