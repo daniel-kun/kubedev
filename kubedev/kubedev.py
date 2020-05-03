@@ -40,6 +40,11 @@ def _build_final_name(first, second):
     return f'{first}-{second}'
 
 
+def _current_kubedev_docker_image():
+  # TODO: Find out kubedev's own version number and put it here
+  return 'kubedev/kubedev:1.0.0'
+
+
 class Kubedev:
   def __init__(self, template_dir):
     """
@@ -75,14 +80,12 @@ class Kubedev:
     projectDescription = kubedev['description']
     imagePullSecrets = kubedev['imagePullSecrets']
     imageRegistry = kubedev['imageRegistry']
-    tag = f'{env_accessor.getenv("CI_COMMIT_SHORT_SHA")}_{env_accessor.getenv("CI_COMMIT_REF_NAME")}'
 
     variables = {
         'KUBEDEV.PROJECT_NAME': projectName,
         'KUBEDEV.PROJECT_DESCRIPTION': projectDescription,
         'KUBEDEV.IMAGEPULLSECRETS': imagePullSecrets,
-        'KUBEDEV.IMAGEREGISTRY': imageRegistry,
-        'KUBEDEV.TAG': tag
+        'KUBEDEV.IMAGEREGISTRY': imageRegistry
     }
 
     envs = kubedev['required-envs'] if 'required-envs' in kubedev else dict()
@@ -92,69 +95,135 @@ class Kubedev:
     file_accessor.save_file(path.join(
         'helm-chart', 'Chart.yaml'), _load_template(chartYamlTemplatePath, variables), overwrite)
 
+    images = dict()  # Collect all images across deployments, cronjobs, etc.
+
     if 'deployments' in kubedev:
-      for deploymentName, value in kubedev['deployments'].items():
-        finalDeploymentName = _build_final_name(projectName, deploymentName)
-        deployEnvs = value['required-envs'] if 'required-envs' in value else dict()
-        ports = value['ports'] if 'ports' in value else dict()
-        replicas = int(value['replicas']) if 'replicas' in value else 2
-        deployVars = {
-            'KUBEDEV.DEPLOYMENT_NAME': finalDeploymentName,
-            'KUBEDEV.DEPLOYMENT_REPLICAS': replicas,
+      deploymentImages = self.generate_deployments(
+          kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite)
+      images.update(deploymentImages)
+
+    self.generate_ci(images, kubedev, projectName, envs, variables,
+                     imageRegistry, file_accessor, overwrite)
+
+    return True
+
+  def generate_deployments(self, kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite):
+    images = dict()  # Collect all images from deployments
+    for deploymentName, value in kubedev['deployments'].items():
+      finalDeploymentName = _build_final_name(projectName, deploymentName)
+      deployEnvs = value['required-envs'] if 'required-envs' in value else dict()
+      ports = value['ports'] if 'ports' in value else dict()
+      replicas = int(value['replicas']) if 'replicas' in value else 2
+      deployVars = {
+          'KUBEDEV.DEPLOYMENT_NAME': finalDeploymentName,
+          'KUBEDEV.DEPLOYMENT_REPLICAS': replicas,
+          **variables
+      }
+      deploymentTemplatePath = path.join(
+          self.template_dir, 'helm-chart', 'deployment.yaml')
+      deployment = yaml.safe_load(
+          _load_template(deploymentTemplatePath, deployVars))
+      allEnvs = {**envs, **deployEnvs}
+      image = f'{imageRegistry}/{finalDeploymentName}'
+      images[deploymentName] = {
+          'image': image,
+          'source': 'deployment'
+      }
+      containers = [{
+          'name': finalDeploymentName,
+          'image': image + ':{{.Values.KUBEDEV_TAG}}',
+          'env': [
+              {
+                  'name': envName,
+                  'value': f'{{{{.Values.{envName}}}}}'
+              } for (envName, envDef) in allEnvs.items()],
+          'ports': [
+              {
+                  'name': portName,
+                  'containerPort': value['container']
+              }
+              for (portName, value) in ports.items() if 'container' in value
+          ]
+      }]
+      deployment['spec']['template']['spec']['containers'] = containers
+      deploymentYamlPath = path.join(
+          'helm-chart', 'templates', 'deployments', deploymentName + '.yaml')
+      file_accessor.save_file(
+          deploymentYamlPath, yaml.safe_dump(deployment), overwrite)
+      servicePorts = [
+          port for (portName, port) in ports.items() if 'service' in port and 'container' in port]
+      if len(servicePorts) > 0:
+        finalServiceName = _build_final_name(projectName, deploymentName)
+        serviceVars = {
+            'KUBEDEV.SERVICE_NAME': finalServiceName,
+            'KUBEDEV.SERVICE_TYPE': 'ClusterIP',
             **variables
         }
-        deploymentTemplatePath = path.join(
-            self.template_dir, 'helm-chart', 'deployment.yaml')
-        deployment = yaml.safe_load(
-            _load_template(deploymentTemplatePath, deployVars))
-        allEnvs = {**envs, **deployEnvs}
-        containers = [{
-            'name': finalDeploymentName,
-            'image': f'{imageRegistry}/{finalDeploymentName}:{tag}',
-            'env': [
-                {
-                    'name': envName,
-                    'value': f'{{{{.Values.{envName}}}}}'
-                } for (envName, envDef) in allEnvs.items()],
-            'ports': [
-                {
-                    'name': portName,
-                    'containerPort': value['container']
-                }
-                for (portName, value) in ports.items() if 'container' in value
-            ]
-        }]
-        deployment['spec']['template']['spec']['containers'] = containers
-        deploymentYamlPath = path.join(
-            'helm-chart', 'templates', 'deployments', deploymentName + '.yaml')
+        serviceTemplatePath = path.join(
+            self.template_dir, 'helm-chart', 'service.yaml')
+        service = yaml.safe_load(
+            _load_template(serviceTemplatePath, serviceVars))
+        service['ports'] = [
+            {
+                'port': port['service'],
+                'targetPort': port['container'],
+                'name': portName
+            } for (portName, port) in ports.items() if 'service' in port and 'container' in port
+        ]
+        service['selector'] = {
+            'kubedev-app': projectName,
+            'kubedev-deployment': finalDeploymentName
+        }
+        serviceYamlPath = path.join(
+            'helm-chart', 'templates', 'deployments', deploymentName + '_service.yaml')
         file_accessor.save_file(
-            deploymentYamlPath, yaml.safe_dump(deployment), overwrite)
-        servicePorts = [
-            port for (portName, port) in ports.items() if 'service' in port and 'container' in port]
-        if len(servicePorts) > 0:
-          finalServiceName = _build_final_name(projectName, deploymentName)
-          serviceVars = {
-              'KUBEDEV.SERVICE_NAME': finalServiceName,
-              'KUBEDEV.SERVICE_TYPE': 'ClusterIP',
-              **variables
+            serviceYamlPath, yaml.safe_dump(service), overwrite)
+    return images
+
+  def generate_ci(self, images, kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite):
+    print(images)
+    oldCi = dict()
+    try:
+      with open('.gitlab-ci.yml', 'r') as f:
+        # Load existing .gitlab-ci.yml, and merge contents
+        oldCi = yaml.safe_load(f.read())
+    except:
+      pass  # Don't load .gitlab-ci.yml if it does not exists or fails otherwise
+
+    if not 'stages' in oldCi:
+      oldCi['stages'] = ['build-push', 'deploy']
+    else:
+      if not 'build-push' in oldCi['stages']:
+        oldCi['stages'].append('build-push')
+      if not 'deploy' in oldCi['stages']:
+        oldCi['stages'].append('deploy')
+
+    for imageKey in images.keys():
+      jobName = f'build-push-{imageKey}'
+      if not jobName in oldCi:
+        oldCi[jobName] = {
+            'stage': 'build-push',
+            'image': _current_kubedev_docker_image(),
+            'script': [
+                'kubedev check',
+                f'kubedev build {imageKey} --tag ${{DOCKER_TAG}}',
+                f'kubedev push {imageKey} --tag ${{DOCKER_TAG}}'
+            ],
+            'variables': {
+                'KUBEDEV_TAG': '${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}'
+            }
+        }
+
+    if not 'deploy' in oldCi:
+      oldCi['deploy'] = {
+          'stage': 'deploy',
+          'image': _current_kubedev_docker_image(),
+          'script': [
+              'kubedev check',
+              'kubedev deploy --version ${CI_PIPELINE_IID} --tag ${DOCKER_TAG}'
+          ],
+          'variables': {
+              'KUBEDEV_TAG': '${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}'
           }
-          serviceTemplatePath = path.join(
-              self.template_dir, 'helm-chart', 'service.yaml')
-          service = yaml.safe_load(
-              _load_template(serviceTemplatePath, serviceVars))
-          service['ports'] = [
-              {
-                  'port': port['service'],
-                  'targetPort': port['container'],
-                  'name': portName
-              } for (portName, port) in ports.items() if 'service' in port and 'container' in port
-          ]
-          service['selector'] = {
-              'kubedev-app': projectName,
-              'kubedev-deployment': finalDeploymentName
-          }
-          serviceYamlPath = path.join(
-              'helm-chart', 'templates', 'deployments', deploymentName + '_service.yaml')
-          file_accessor.save_file(
-              serviceYamlPath, yaml.safe_dump(service), overwrite)
-    return True
+      }
+    file_accessor.save_file('.gitlab-ci.yml', yaml.safe_dump(oldCi), overwrite)
