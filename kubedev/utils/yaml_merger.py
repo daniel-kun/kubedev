@@ -2,13 +2,6 @@ import ruamel.yaml
 
 # https://stackoverflow.com/questions/40235554/python-use-pyyaml-and-keep-format
 
-# conf = open("results.conf", "r")
-# results = ruamel.yaml.load(conf, ruamel.yaml.RoundTripLoader)
-# conf.close()
-# results['nas']['mount_dirs'][0] = "haha"
-# with open('/home/zonion/speedio/speedio.conf', 'w') as conf:
-#   ruamel.yaml.dump(results, conf, ruamel.yaml.RoundTripDumper)
-
 
 def _find_first_of_type(_list, _type):
   for item in _list:
@@ -31,6 +24,8 @@ def _is_marked_as_overwrite(mergeObject, key):
 
 
 def _merge_dicts(source, mergeObject):
+  if isinstance(source, type(None)):
+    source = dict()
   for (key, item) in mergeObject.items():
     if not key in source:
       source[key] = item
@@ -50,6 +45,17 @@ def _merge_dicts(source, mergeObject):
 class YamlMerger:
   @staticmethod
   def merge(sourceYaml, mergeObject):
-    src = ruamel.yaml.round_trip_load(sourceYaml)
-    result = _merge_dicts(src, mergeObject)
-    return ruamel.yaml.round_trip_dump(result)
+    if isinstance(sourceYaml, str):
+      src = ruamel.yaml.round_trip_load(sourceYaml)
+    else:
+      src = sourceYaml
+    if isinstance(mergeObject, str):
+      merge = ruamel.yaml.round_trip_load(mergeObject)
+    else:
+      merge = mergeObject
+    return _merge_dicts(src, merge)
+#    return ruamel.yaml.round_trip_dump(result)
+
+  @staticmethod
+  def dump(o):
+    return ruamel.yaml.round_trip_dump(o)

@@ -1,12 +1,12 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: %%KUBEDEV.DEPLOYMENT_NAME%%
+  name: %%KUBEDEV.DEPLOYMENT_NAME%% # OVERWRITE
   labels:
-    kubedev-app: %%KUBEDEV.PROJECT_NAME%%
-    kubedev-deployment: %%KUBEDEV.DEPLOYMENT_NAME%%
+    kubedev-app: %%KUBEDEV.PROJECT_NAME%% # OVERWRITE
+    kubedev-deployment: %%KUBEDEV.DEPLOYMENT_NAME%% # OVERWRITE
 spec:
-  replicas: %%KUBEDEV.DEPLOYMENT_REPLICAS%%
+  replicas: %%KUBEDEV.DEPLOYMENT_REPLICAS%% # OVERWRITE
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -15,8 +15,8 @@ spec:
   template:
     metadata:
       labels:
-        kubedev-app: %%KUBEDEV.PROJECT_NAME%%
-        kubedev-deployment: %%KUBEDEV.DEPLOYMENT_NAME%%
+        kubedev-app: %%KUBEDEV.PROJECT_NAME%% # OVERWRITE
+        kubedev-deployment: %%KUBEDEV.DEPLOYMENT_NAME%% # OVERWRITE
     spec:
       imagePullSecrets:
       - name: %%KUBEDEV.IMAGEPULLSECRETS%%

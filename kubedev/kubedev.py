@@ -5,6 +5,8 @@ from os import getenv, path
 
 import yaml
 
+from kubedev.utils import YamlMerger
+
 
 class RealFileAccessor:
   def load_file(self, filename):
@@ -174,31 +176,30 @@ class Kubedev:
       servicePorts = [
           port for (portName, port) in ports.items() if 'service' in port and 'container' in port]
       if len(servicePorts) > 0:
-        finalServiceName = _build_final_name(projectName, deploymentName)
+        finalServiceName = finalDeploymentName
         serviceVars = {
             'KUBEDEV.SERVICE_NAME': finalServiceName,
             'KUBEDEV.SERVICE_TYPE': 'ClusterIP',
-            **variables
-        }
-        serviceTemplatePath = path.join(
-            self.template_dir, 'helm-chart', 'service.yaml')
-        service = yaml.safe_load(
-            _load_template(serviceTemplatePath, serviceVars))
-        service['ports'] = [
-            {
-                'port': port['service'],
-                'targetPort': port['container'],
-                'name': portName
-            } for (portName, port) in ports.items() if 'service' in port and 'container' in port
-        ]
-        service['selector'] = {
-            'kubedev-app': projectName,
-            'kubedev-deployment': finalDeploymentName
+            **deployVars
         }
         serviceYamlPath = path.join(
             'helm-chart', 'templates', 'deployments', deploymentName + '_service.yaml')
+        serviceTemplatePath = path.join(
+            self.template_dir, 'helm-chart', 'service.yaml')
+        serviceYamlFile = file_accessor.load_file(serviceYamlPath)
+        service = YamlMerger.merge(
+            serviceYamlFile if not isinstance(
+                serviceYamlFile, type(None)) else "",
+            _load_template(serviceTemplatePath, serviceVars))
+        service['spec']['ports'] = [
+            {
+                'port': int(port['service']),
+                'targetPort': int(port['container']),
+                'name': portName
+            } for (portName, port) in ports.items() if 'service' in port and 'container' in port
+        ]
         file_accessor.save_file(
-            serviceYamlPath, yaml.safe_dump(service), overwrite)
+            serviceYamlPath, YamlMerger.dump(service), True)
     return (images, portForwards)
 
   def generate_ci(self, images, kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite):

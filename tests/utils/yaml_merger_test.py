@@ -1,7 +1,5 @@
 import unittest
 
-import ruamel.yaml
-
 from kubedev.utils import YamlMerger
 
 
@@ -10,25 +8,24 @@ class YamlMergerTests(unittest.TestCase):
   def test_merge_overwrite_conflicts(self):
     source = '''foo: Bar
 '''
-    result = YamlMerger.merge(source, ruamel.yaml.round_trip_load('''foo: Baz # OVERWRITE
+    result = YamlMerger.merge(source, '''foo: Baz # OVERWRITE
 bar: Boo
-'''))
+''')
 
     self.assertEqual('''foo: Baz
 bar: Boo
-''', result)
+''', YamlMerger.dump(result))
 
   def test_merge_keep_conflicts(self):
     source = '''foo: Bar
 '''
-    result = YamlMerger.merge(source, {
-        'foo': 'Baz',
-        'bar': 'Boo'
-    })
+    result = YamlMerger.merge(source, '''foo: Baz
+bar: Boo
+''')
 
     self.assertEqual('''foo: Bar
 bar: Boo
-''', result)
+''', YamlMerger.dump(result))
 
   def test_merge_tree_keep_conflicts(self):
     source = '''root:
@@ -38,16 +35,13 @@ bar: Boo
     x: 10
     y: 11
 '''
-    result = YamlMerger.merge(source, {
-        'root': {
-            'b': 99,
-            'c': 3,
-            'node': {
-                'x': 98,
-                'z': 12
-            }
-        }
-    })
+    result = YamlMerger.merge(source, '''root:
+  b: 99
+  c: 3
+  node:
+    x: 98
+    z: 12
+''')
 
     self.assertEqual('''root:
   a: 1
@@ -57,7 +51,7 @@ bar: Boo
     y: 11
     z: 12
   c: 3
-''', result)
+''', YamlMerger.dump(result))
 
   def test_merge_tree_overwrite_conflicts(self):
     source = '''root:
@@ -67,13 +61,13 @@ bar: Boo
     x: 10
     y: 11
 '''
-    result = YamlMerger.merge(source, ruamel.yaml.round_trip_load('''root:
+    result = YamlMerger.merge(source, '''root:
   b: 99 # OVERWRITE
   c: 3
   node:
     x: 98 # OVERWRITE
     z: 12
-'''))
+''')
 
     self.assertEqual('''root:
   a: 1
@@ -83,4 +77,4 @@ bar: Boo
     y: 11
     z: 12
   c: 3
-''', result)
+''', YamlMerger.dump(result))
