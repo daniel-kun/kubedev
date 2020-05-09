@@ -300,7 +300,6 @@ class Kubedev:
     variables = self._variables_from_kubedev(kubedev)
     tag = 'xxx'  # TODO
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor)
-    kubecontext = self._get_kubecontext_arg(env_accessor)
     shell = env_accessor.getenv('SHELL')
     command = [
         shell,
