@@ -10,8 +10,11 @@ from kubedev.utils import YamlMerger
 
 class RealFileAccessor:
   def load_file(self, filename):
-    with open(filename, 'r') as f:
-      return f.read()
+    try:
+      with open(filename, 'r') as f:
+        return f.read()
+    except FileNotFoundError:
+      return ''
 
   def save_file(self, filename, content, overwrite):
     targetDir = path.dirname(path.realpath(filename))
@@ -163,7 +166,7 @@ class Kubedev:
           'ports': [
               {
                   'name': portName,
-                  'containerPort': value['container']
+                  'containerPort': int(value['container'])
               }
               for (portName, value) in ports.items() if 'container' in value
           ]
