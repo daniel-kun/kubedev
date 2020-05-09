@@ -1,4 +1,5 @@
 testrange/templates
+testrange/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

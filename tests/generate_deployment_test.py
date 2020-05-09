@@ -155,9 +155,9 @@ class KubeDevGenerateDeploymentTests(unittest.TestCase):
     self.assertIn('ports', container0)
     ports = container0['ports']
     self.assertEqual(2, len(ports))
-    self.assertListEqual([{'containerPort': "8443", "name": "https"}], [
+    self.assertListEqual([{'containerPort': 8443, "name": "https"}], [
                          port for port in ports if port['name'] == 'https'])
-    self.assertListEqual([{'containerPort': "8081", "name": "http"}], [
+    self.assertListEqual([{'containerPort': 8081, "name": "http"}], [
                          port for port in ports if port['name'] == 'http'])
 
   def test_deployment_services_overwrite_and_keep(self):
@@ -185,8 +185,8 @@ spec:
             "foo-service": {
                 "ports": {
                     "http": {
-                        "container": "8081",
-                        "service": "8082"
+                        "container": 8081,
+                        "service": 8082
                     }
                 }
             }
@@ -208,8 +208,8 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    kubedev-app: foo-service # OVERWRITE
-    kubedev-deployment: foo-service # OVERWRITE
+    kubedev-app: foo-service
+    kubedev-deployment: foo-service
   ports:
   - name: http
     port: 8082
