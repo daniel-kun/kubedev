@@ -193,9 +193,9 @@ class Kubedev:
             _load_template(serviceTemplatePath, serviceVars))
         service['spec']['ports'] = [
             {
+                'name': portName,
                 'port': int(port['service']),
-                'targetPort': int(port['container']),
-                'name': portName
+                'targetPort': int(port['container'])
             } for (portName, port) in ports.items() if 'service' in port and 'container' in port
         ]
         file_accessor.save_file(

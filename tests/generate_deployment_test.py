@@ -211,13 +211,15 @@ spec:
     kubedev-app: foo-service # OVERWRITE
     kubedev-deployment: foo-service # OVERWRITE
   ports:
-  - port: 8082
+  - name: http
+    port: 8082
     targetPort: 8081
-    name: http
 ''', testServiceYaml)
 
   def test_dont_keep_the_overwrite_comment(self):
-    self.skipTest()  # In the above test, the 'OVERWIRTE' comments should not be preserved from the template
+    # In the above test, the 'OVERWIRTE' comments should not be preserved from the template
+    self.skipTest(
+        "For sub-nodes that don't exist in the target document, # OVERWRITE comments are not deleted.")
 
   def test_deployment_services(self):
     # ARRANGE
@@ -234,19 +236,18 @@ spec:
         'helm-chart/templates/deployments/foo-deploy_service.yaml')
     self.assertIsNotNone(testServiceYaml)
     testService = yaml.safe_load(testServiceYaml)
-    print(testServiceYaml)
     self.assertIn('apiVersion', testService)
     self.assertIn('kind', testService)
     self.assertEqual('Service', testService['kind'])
     self.assertIn('metadata', testService)
-    self.assertEqual(2, len(testService['ports']))
+    self.assertEqual(2, len(testService['spec']['ports']))
     self.assertListEqual([{
         'name': 'https',
-        'port': '8543',
-        'targetPort': '8443'
-    }], [port for port in testService['ports'] if port['name'] == 'https'])
+        'port': 8543,
+        'targetPort': 8443
+    }], [port for port in testService['spec']['ports'] if port['name'] == 'https'])
     self.assertListEqual([{
         'name': 'http',
-        'port': '8082',
-        'targetPort': '8081'
-    }], [port for port in testService['ports'] if port['name'] == 'http'])
+        'port': 8082,
+        'targetPort': 8081
+    }], [port for port in testService['spec']['ports'] if port['name'] == 'http'])
