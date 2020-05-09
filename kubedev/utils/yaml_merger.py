@@ -28,7 +28,12 @@ def _merge_dicts(source, mergeObject):
     source = dict()
   for (key, item) in mergeObject.items():
     if not key in source:
-      source[key] = item
+      if isinstance(item, dict):
+        # Strip meta-information like comments:
+        source[key] = dict()
+        _merge_dicts(source[key], item)
+      else:
+        source[key] = item
     else:
       if isinstance(item, dict):
         if isinstance(source[key], dict):

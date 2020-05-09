@@ -78,3 +78,31 @@ bar: Boo
     z: 12
   c: 3
 ''', YamlMerger.dump(result))
+
+  def test_merge_dont_keep_comments_from_template(self):
+    source = '''root:
+  a: 1
+  node1:
+    x: 11
+'''
+    result = YamlMerger.merge(source, '''root:
+  a: 99 # OVERWRITE
+  b: 99 # OVERWRITE
+  node1:
+    x: 98 # OVERWRITE
+    y: 12 # OVERWRITE
+  node2:
+    x: 98 # OVERWRITE
+    y: 12 # OVERWRITE
+''')
+
+    self.assertEqual('''root:
+  a: 99
+  node1:
+    x: 98
+    y: 12
+  b: 99
+  node2:
+    x: 98
+    y: 12
+''', YamlMerger.dump(result))
