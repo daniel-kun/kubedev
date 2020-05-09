@@ -216,11 +216,6 @@ spec:
     targetPort: 8081
 ''', testServiceYaml)
 
-  def test_dont_keep_the_overwrite_comment(self):
-    # In the above test, the 'OVERWIRTE' comments should not be preserved from the template
-    self.skipTest(
-        "For sub-nodes that don't exist in the target document, # OVERWRITE comments are not deleted.")
-
   def test_deployment_services(self):
     # ARRANGE
     fileMock = FileMock()

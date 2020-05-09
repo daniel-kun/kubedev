@@ -1,11 +1,12 @@
 import json
 import pathlib
+import subprocess
 from io import StringIO
-from os import getenv, path
+from os import environ, getenv, path
 
 import yaml
 
-from kubedev.utils import YamlMerger
+from kubedev.utils import KubedevConfig, YamlMerger
 
 
 class RealFileAccessor:
@@ -24,6 +25,13 @@ class RealFileAccessor:
 
   def mkdirhier(self, path):
     return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+
+class RealShellExecutor:
+  def execute(self, commandWithArgs, envVars):
+    print(
+        f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})')
+    return subprocess.run(commandWithArgs, env={**environ, **envVars})
 
 
 class RealEnvAccessor:
@@ -63,6 +71,18 @@ class Kubedev:
     """
     self.template_dir = template_dir
 
+  def _load_config(self, configFileName):
+    with open(configFileName) as f:
+      return json.loads(f.read())
+
+  def _variables_from_kubedev(self, kubedev):
+    return {
+        'KUBEDEV_PROJECT_NAME': kubedev['name'],
+        'KUBEDEV_PROJECT_DESCRIPTION': kubedev['description'],
+        'KUBEDEV_IMAGEPULLSECRETS': kubedev['imagePullSecrets'],
+        'KUBEDEV_IMAGEREGISTRY': kubedev['imageRegistry']
+    }
+
   def generate(self, configFileName, overwrite=False, file_accessor=RealFileAccessor(), env_accessor=RealEnvAccessor()):
     """
     Loads kubedev.json from the local directory and generates files according to kubedev.json's content.
@@ -71,10 +91,7 @@ class Kubedev:
     :param file_accessor: An injectable class instance that must implement load_file(self, filename) and save_file(self, filename, content).
                           Used to mock this function for unit tests.
     """
-    with open(configFileName) as f:
-      kubedev = json.loads(f.read())
-
-    return self.generate_from_config(kubedev, overwrite, file_accessor, env_accessor)
+    return self.generate_from_config(self._load_config(configFileName), overwrite, file_accessor, env_accessor)
 
   def generate_from_config(self, kubedev, overwrite, file_accessor, env_accessor):
     """
@@ -86,16 +103,9 @@ class Kubedev:
                           Used to mock this function for unit tests.
     """
     projectName = kubedev['name']
-    projectDescription = kubedev['description']
-    imagePullSecrets = kubedev['imagePullSecrets']
     imageRegistry = kubedev['imageRegistry']
 
-    variables = {
-        'KUBEDEV.PROJECT_NAME': projectName,
-        'KUBEDEV.PROJECT_DESCRIPTION': projectDescription,
-        'KUBEDEV.IMAGEPULLSECRETS': imagePullSecrets,
-        'KUBEDEV.IMAGEREGISTRY': imageRegistry
-    }
+    variables = self._variables_from_kubedev(kubedev)
 
     envs = kubedev['required-envs'] if 'required-envs' in kubedev else dict()
 
@@ -141,8 +151,8 @@ class Kubedev:
       ]
       replicas = int(value['replicas']) if 'replicas' in value else 2
       deployVars = {
-          'KUBEDEV.DEPLOYMENT_NAME': finalDeploymentName,
-          'KUBEDEV.DEPLOYMENT_REPLICAS': replicas,
+          'KUBEDEV_DEPLOYMENT_NAME': finalDeploymentName,
+          'KUBEDEV_DEPLOYMENT_REPLICAS': replicas,
           **variables
       }
       deploymentTemplatePath = path.join(
@@ -181,8 +191,8 @@ class Kubedev:
       if len(servicePorts) > 0:
         finalServiceName = finalDeploymentName
         serviceVars = {
-            'KUBEDEV.SERVICE_NAME': finalServiceName,
-            'KUBEDEV.SERVICE_TYPE': 'ClusterIP',
+            'KUBEDEV_SERVICE_NAME': finalServiceName,
+            'KUBEDEV_SERVICE_TYPE': 'ClusterIP',
             **deployVars
         }
         serviceYamlPath = path.join(
@@ -277,3 +287,27 @@ class Kubedev:
       file_accessor.mkdirhier(imageKey)
       dockerfile = f'{imageKey}/Dockerfile'
       file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
+
+  def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
+    self.template_from_config(
+        self._load_config(configFileName), shell_executor, env_accessor)
+
+  def _get_kubecontext_arg(self, env_accessor):
+    e = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
+    return f'--kube-context {e}' if e != None and isinstance(e, str) and e != '' else ' '
+
+  def template_from_config(self, kubedev, shell_executor, env_accessor):
+    variables = self._variables_from_kubedev(kubedev)
+    tag = 'xxx'  # TODO
+    kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor)
+    kubecontext = self._get_kubecontext_arg(env_accessor)
+    shell = env_accessor.getenv('SHELL')
+    command = [
+        shell,
+        '-c',
+        f'helm template ./helm-chart/ --name {kubedev["name"]} --wait ' +
+        f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
+        f'--set KUBEDEV_TAG="{tag}"' +
+        KubedevConfig.get_set_env_args(kubedev)
+    ]
+    shell_executor.execute(command, variables)

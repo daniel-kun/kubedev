@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: %%KUBEDEV.SERVICE_NAME%% # OVERWRITE
+  name: %%KUBEDEV_SERVICE_NAME%% # OVERWRITE
   labels:
-    kubedev-app: %%KUBEDEV.PROJECT_NAME%% # OVERWRITE
-    kubedev-deployment: %%KUBEDEV.DEPLOYMENT_NAME%% # OVERWRITE
+    kubedev-app: %%KUBEDEV_PROJECT_NAME%% # OVERWRITE
+    kubedev-deployment: %%KUBEDEV_DEPLOYMENT_NAME%% # OVERWRITE
 spec:
-  type: %%KUBEDEV.SERVICE_TYPE%%
+  type: %%KUBEDEV_SERVICE_TYPE%%
   selector:
-    kubedev-app: %%KUBEDEV.PROJECT_NAME%% # OVERWRITE
-    kubedev-deployment: %%KUBEDEV.DEPLOYMENT_NAME%% # OVERWRITE
+    kubedev-app: %%KUBEDEV_PROJECT_NAME%% # OVERWRITE
+    kubedev-deployment: %%KUBEDEV_DEPLOYMENT_NAME%% # OVERWRITE

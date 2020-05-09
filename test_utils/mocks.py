@@ -1,4 +1,15 @@
 
+class ShellExecutorMock:
+  def __init__(self):
+    self._calls = []
+
+  def execute(self, commandWithArgs, envVars):
+    self._calls.append({'cmd': commandWithArgs, 'env': envVars})
+
+  def calls(self):
+    return self._calls
+
+
 class FileMock:
   def __init__(self):
     self.files = dict()
