@@ -17,10 +17,18 @@ import sys
 
 from kubedev import Kubedev
 
+
+def add_common_arguments(argParser):
+  argParser.add_argument(
+      '-c', '--config', help='Path to config file', required=False, default='kubedev.json')
+
+
 if __name__ == '__main__':
   generatorArgParser = argparse.ArgumentParser()
-  generatorArgParser.add_argument(
-      '-c', '--config', help='Path to config file', required=False, default='kubedev.json')
+  add_common_arguments(generatorArgParser)
+
+  templateArgParser = argparse.ArgumentParser()
+  add_common_arguments(templateArgParser)
 
   def print_help(argv):
     print('HELP: TODO')
@@ -30,8 +38,14 @@ if __name__ == '__main__':
     kubedev = Kubedev('./templates/')  # TODO: Find templates dir
     kubedev.generate(args.config)
 
+  def template(argv):
+    args = templateArgParser.parse_args(argv)
+    kubedev = Kubedev('./templates/')
+    kubedev.template(args.config)
+
   commands = {
       'generate': generate,
+      'template': template,
       'help': print_help
   }
 

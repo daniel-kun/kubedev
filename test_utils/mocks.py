@@ -35,11 +35,11 @@ class EnvMock:
   def __init__(self):
     self.envs = dict()
 
-  def getenv(self, name):
+  def getenv(self, name, default=None):
     if name in self.envs:
       return self.envs[name]
     else:
-      return None
+      return default
 
   def setenv(self, name, value):
     self.envs[name] = value

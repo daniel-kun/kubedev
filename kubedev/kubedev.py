@@ -35,8 +35,8 @@ class RealShellExecutor:
 
 
 class RealEnvAccessor:
-  def getenv(self, name):
-    return getenv(name)
+  def getenv(self, name, default=None):
+    return getenv(name, default)
 
 
 def _replace_variables(text, variables):
@@ -62,6 +62,15 @@ def _current_kubedev_docker_image():
   return 'kubedev/kubedev:1.0.0'
 
 
+def _get_tag(env_accessor):
+  commit, branch = (env_accessor.getenv('CI_COMMIT_SHORT_SHA'),
+                    env_accessor.getenv('CI_COMMIT_REF_NAME'))
+  if not isinstance(commit, type(None)) and not isinstance(branch, type(None)):
+    return f'{commit}_{branch}'
+  else:
+    return 'none'  # When outside of the CI environment, the tag usually will be overwritten by tilt anyways, so it is irrelevant
+
+
 class Kubedev:
   def __init__(self, template_dir):
     """
@@ -74,14 +83,6 @@ class Kubedev:
   def _load_config(self, configFileName):
     with open(configFileName) as f:
       return json.loads(f.read())
-
-  def _variables_from_kubedev(self, kubedev):
-    return {
-        'KUBEDEV_PROJECT_NAME': kubedev['name'],
-        'KUBEDEV_PROJECT_DESCRIPTION': kubedev['description'],
-        'KUBEDEV_IMAGEPULLSECRETS': kubedev['imagePullSecrets'],
-        'KUBEDEV_IMAGEREGISTRY': kubedev['imageRegistry']
-    }
 
   def generate(self, configFileName, overwrite=False, file_accessor=RealFileAccessor(), env_accessor=RealEnvAccessor()):
     """
@@ -105,7 +106,7 @@ class Kubedev:
     projectName = kubedev['name']
     imageRegistry = kubedev['imageRegistry']
 
-    variables = self._variables_from_kubedev(kubedev)
+    variables = KubedevConfig.get_global_variables(kubedev)
 
     envs = kubedev['required-envs'] if 'required-envs' in kubedev else dict()
 
@@ -288,25 +289,25 @@ class Kubedev:
       dockerfile = f'{imageKey}/Dockerfile'
       file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
 
-  def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
+  def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
     self.template_from_config(
-        self._load_config(configFileName), shell_executor, env_accessor)
+        self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
 
   def _get_kubecontext_arg(self, env_accessor):
     e = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
     return f'--kube-context {e}' if e != None and isinstance(e, str) and e != '' else ' '
 
-  def template_from_config(self, kubedev, shell_executor, env_accessor):
-    variables = self._variables_from_kubedev(kubedev)
-    tag = 'xxx'  # TODO
-    kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor)
+  def template_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
+    variables = KubedevConfig.get_global_variables(kubedev)
+    tag = _get_tag(env_accessor)
+    kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
     shell = env_accessor.getenv('SHELL')
     command = [
         shell,
         '-c',
-        f'helm template ./helm-chart/ --name {kubedev["name"]} --wait ' +
+        f'helm template ./helm-chart/ --name {kubedev["name"]} ' +
         f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
         f'--set KUBEDEV_TAG="{tag}"' +
-        KubedevConfig.get_set_env_args(kubedev)
+        KubedevConfig.get_helm_set_env_args(kubedev)
     ]
     shell_executor.execute(command, variables)
