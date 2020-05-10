@@ -127,4 +127,4 @@ class KubeDevGenerateCITests(unittest.TestCase):
         '${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}', job['variables']['KUBEDEV_TAG'])
 
   def test_ci_uses_equal_kubedev_version(self):
-    self.skipTest('Not yet implemented')
+    self.skipTest('Not yet implemented: Pinning the kubedev version')

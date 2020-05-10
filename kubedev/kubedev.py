@@ -18,6 +18,8 @@ class RealFileAccessor:
       return ''
 
   def save_file(self, filename, content, overwrite):
+    if not overwrite and path.exists(filename):
+      return
     targetDir = path.dirname(path.realpath(filename))
     pathlib.Path(targetDir).mkdir(parents=True, exist_ok=True)
     with open(filename, 'w') as f:
@@ -128,7 +130,8 @@ class Kubedev:
     self.generate_ci(images, kubedev, projectName, envs, variables,
                      imageRegistry, file_accessor, overwrite)
 
-    self.generate_tiltfile(images, portForwards, file_accessor, overwrite)
+    self.generate_tiltfile(
+        projectName, images, portForwards, file_accessor, overwrite)
 
     self.generate_projects(images, file_accessor)
 
@@ -264,7 +267,7 @@ class Kubedev:
       }
     file_accessor.save_file('.gitlab-ci.yml', yaml.safe_dump(oldCi), overwrite)
 
-  def generate_tiltfile(self, images, portForwards, file_accessor, overwrite):
+  def generate_tiltfile(self, projectName, images, portForwards, file_accessor, overwrite):
     print('💫 Generating Tiltfile...')
     tiltfile = StringIO()
     for imageKey, image in images.items():
@@ -278,7 +281,7 @@ class Kubedev:
       portForwardStr = ",".join(
           [f"'{p['dev']}:{p['service']}'" for p in portForward])
       tiltfile.write(
-          f"k8s_resource('{portKey}', port_forwards=[{portForwardStr}])\n")
+          f"k8s_resource('{projectName}-{portKey}', port_forwards=[{portForwardStr}])\n")
 
     file_accessor.save_file('Tiltfile', tiltfile.getvalue(), overwrite)
 

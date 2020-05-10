@@ -40,4 +40,8 @@ class KubeDevGenerateTiltfile(unittest.TestCase):
         "docker_build('foo-registry/foo-service-foo-deploy', 'foo-deploy')", tiltfile)
     self.assertIn("k8s_yaml(local('kubedev template'))", tiltfile)
     self.assertIn(
-        "k8s_resource('foo-deploy', port_forwards=['8083:8082','8643:8543'])", tiltfile)
+        "k8s_resource('foo-service-foo-deploy', port_forwards=['8083:8082','8643:8543'])", tiltfile)
+
+  def test_docker_build_args(self):
+    self.skipTest(
+        'Not yet implemented: Passing build_args to `docker build'' in Tiltfile')
