@@ -35,12 +35,12 @@ if __name__ == '__main__':
 
   def generate(argv):
     args = generatorArgParser.parse_args(argv)
-    kubedev = Kubedev('./templates/')  # TODO: Find templates dir
+    kubedev = Kubedev()  # TODO: Find templates dir
     kubedev.generate(args.config)
 
   def template(argv):
     args = templateArgParser.parse_args(argv)
-    kubedev = Kubedev('./templates/')
+    kubedev = Kubedev()
     kubedev.template(args.config)
 
   commands = {

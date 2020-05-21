@@ -4,8 +4,8 @@ import subprocess
 from io import StringIO
 from os import environ, getenv, path
 
+import pkg_resources
 import yaml
-
 from kubedev.utils import KubedevConfig, YamlMerger
 
 
@@ -41,15 +41,20 @@ class RealEnvAccessor:
     return getenv(name, default)
 
 
+class RealTemplateAccessor:
+  def load_template(self, file):
+    return pkg_resources.resource_string(__name__, path.join('templates', file))
+
+
+def _load_template(file, variables, template_accessor):
+  content = template_accessor.load_template(file)
+  return _replace_variables(content.decode('utf-8'), variables)
+
+
 def _replace_variables(text, variables):
   for key, value in variables.items():
     text = text.replace(f'%%{key}%%', f'{value}')
   return text
-
-
-def _load_template(file, variables):
-  with open(file, 'r') as f:
-    return _replace_variables(f.read(), variables)
 
 
 def _build_final_name(first, second):
@@ -74,19 +79,12 @@ def _get_tag(env_accessor):
 
 
 class Kubedev:
-  def __init__(self, template_dir):
-    """
-    Initiates a Kubedev object.
-
-    :param template_dir: The directory where kubedev searches for template files. This is usually installed globally when installing kubedev.
-    """
-    self.template_dir = template_dir
 
   def _load_config(self, configFileName):
     with open(configFileName) as f:
       return json.loads(f.read())
 
-  def generate(self, configFileName, overwrite=False, file_accessor=RealFileAccessor(), env_accessor=RealEnvAccessor()):
+  def generate(self, configFileName, overwrite=False, file_accessor=RealFileAccessor(), env_accessor=RealEnvAccessor(), template_accessor=RealTemplateAccessor()):
     """
     Loads kubedev.json from the local directory and generates files according to kubedev.json's content.
 
@@ -94,9 +92,9 @@ class Kubedev:
     :param file_accessor: An injectable class instance that must implement load_file(self, filename) and save_file(self, filename, content).
                           Used to mock this function for unit tests.
     """
-    return self.generate_from_config(self._load_config(configFileName), overwrite, file_accessor, env_accessor)
+    return self.generate_from_config(self._load_config(configFileName), overwrite, file_accessor, env_accessor, template_accessor)
 
-  def generate_from_config(self, kubedev, overwrite, file_accessor, env_accessor):
+  def generate_from_config(self, kubedev, overwrite, file_accessor, env_accessor, template_accessor):
     """
     Generates files according to the config from the kubedev object, which must be a dict of the structure of a kubedev.json file.
 
@@ -112,10 +110,9 @@ class Kubedev:
 
     envs = kubedev['required-envs'] if 'required-envs' in kubedev else dict()
 
-    chartYamlTemplatePath = path.join(
-        self.template_dir, 'helm-chart', 'Chart.yaml')
+    chartYamlTemplatePath = path.join('helm-chart', 'Chart.yaml')
     file_accessor.save_file(path.join(
-        'helm-chart', 'Chart.yaml'), _load_template(chartYamlTemplatePath, variables), overwrite)
+        'helm-chart', 'Chart.yaml'), _load_template(chartYamlTemplatePath, variables, template_accessor), overwrite)
 
     images = dict()  # Collect all images across deployments, cronjobs, etc.
     portForwards = dict()  # Collect all port-forwards for deployments and daemonsets for tilt
@@ -123,7 +120,7 @@ class Kubedev:
     print('⚓ Generating helm-chart...')
     if 'deployments' in kubedev:
       (deploymentImages, deploymentPortForwards) = self.generate_deployments(
-          kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite)
+          kubedev, projectName, envs, variables, imageRegistry, file_accessor, template_accessor, overwrite)
       images.update(deploymentImages)
       portForwards.update(deploymentPortForwards)
 
@@ -137,7 +134,7 @@ class Kubedev:
 
     return True
 
-  def generate_deployments(self, kubedev, projectName, envs, variables, imageRegistry, file_accessor, overwrite):
+  def generate_deployments(self, kubedev, projectName, envs, variables, imageRegistry, file_accessor, template_accessor, overwrite):
     images = dict()  # Collect all images from deployments
     portForwards = dict()  # Collect all port-forwads for tilt
     for deploymentName, value in kubedev['deployments'].items():
@@ -159,10 +156,9 @@ class Kubedev:
           'KUBEDEV_DEPLOYMENT_REPLICAS': replicas,
           **variables
       }
-      deploymentTemplatePath = path.join(
-          self.template_dir, 'helm-chart', 'deployment.yaml')
+      deploymentTemplatePath = path.join('helm-chart', 'deployment.yaml')
       deployment = yaml.safe_load(
-          _load_template(deploymentTemplatePath, deployVars))
+          _load_template(deploymentTemplatePath, deployVars, template_accessor))
       allEnvs = {**envs, **deployEnvs}
       image = f'{imageRegistry}/{finalDeploymentName}'
       images[deploymentName] = {
@@ -201,13 +197,12 @@ class Kubedev:
         }
         serviceYamlPath = path.join(
             'helm-chart', 'templates', 'deployments', deploymentName + '_service.yaml')
-        serviceTemplatePath = path.join(
-            self.template_dir, 'helm-chart', 'service.yaml')
+        serviceTemplatePath = path.join('helm-chart', 'service.yaml')
         serviceYamlFile = file_accessor.load_file(serviceYamlPath)
         service = YamlMerger.merge(
             serviceYamlFile if not isinstance(
                 serviceYamlFile, type(None)) else "",
-            _load_template(serviceTemplatePath, serviceVars))
+            _load_template(serviceTemplatePath, serviceVars, template_accessor))
         service['spec']['ports'] = [
             {
                 'name': portName,

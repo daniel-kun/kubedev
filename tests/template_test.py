@@ -1,7 +1,6 @@
 import unittest
 
 import yaml
-
 from kubedev import Kubedev
 from kubedev.utils import kubeconfig_temp_path
 from test_utils import (EnvMock, FileMock, ShellExecutorMock,
@@ -22,7 +21,7 @@ class KubeDevTemplateTests(unittest.TestCase):
     files = FileMock()
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.template_from_config(testDeploymentConfig, shell, env, files)
 
     # ASSERT
@@ -56,7 +55,7 @@ lkasjfjklsdflkj:
     files = FileMock()
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.template_from_config(testMultiDeploymentsConfig, shell, env, files)
 
     # ASSERT

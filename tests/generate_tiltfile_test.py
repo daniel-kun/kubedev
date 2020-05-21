@@ -1,9 +1,8 @@
 import unittest
 
 import yaml
-
 from kubedev import Kubedev
-from test_utils import EnvMock, FileMock, testDeploymentConfig
+from test_utils import EnvMock, FileMock, TemplateMock, testDeploymentConfig
 
 
 class KubeDevGenerateTiltfile(unittest.TestCase):
@@ -14,9 +13,9 @@ class KubeDevGenerateTiltfile(unittest.TestCase):
     envMock = EnvMock()
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     tiltYaml = fileMock.load_file('Tiltfile')
@@ -28,9 +27,9 @@ class KubeDevGenerateTiltfile(unittest.TestCase):
     envMock = EnvMock()
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     tiltfile = fileMock.load_file('Tiltfile')

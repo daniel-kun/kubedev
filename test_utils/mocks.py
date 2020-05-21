@@ -1,3 +1,5 @@
+import os
+
 
 class ShellExecutorMock:
   def __init__(self):
@@ -43,3 +45,9 @@ class EnvMock:
 
   def setenv(self, name, value):
     self.envs[name] = value
+
+
+class TemplateMock:
+  def load_template(self, file):
+    with open(os.path.join('kubedev', 'templates', file), 'br') as f:
+      return f.read()

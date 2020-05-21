@@ -1,9 +1,8 @@
 import unittest
 
 import yaml
-
 from kubedev import Kubedev
-from test_utils import EnvMock, FileMock, testDeploymentConfig
+from test_utils import EnvMock, FileMock, TemplateMock, testDeploymentConfig
 
 
 class KubeDevGenerateCITests(unittest.TestCase):
@@ -16,9 +15,9 @@ class KubeDevGenerateCITests(unittest.TestCase):
     envMock.setenv('CI_COMMIT_REF_NAME', '_branch')
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     ciYaml = fileMock.load_file('.gitlab-ci.yml')
@@ -32,9 +31,9 @@ class KubeDevGenerateCITests(unittest.TestCase):
     envMock.setenv('CI_COMMIT_REF_NAME', '_branch')
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     ciYaml = fileMock.load_file('.gitlab-ci.yml')
@@ -52,9 +51,9 @@ class KubeDevGenerateCITests(unittest.TestCase):
     envMock.setenv('CI_COMMIT_REF_NAME', '_branch')
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     ciYaml = fileMock.load_file('.gitlab-ci.yml')
@@ -78,9 +77,9 @@ class KubeDevGenerateCITests(unittest.TestCase):
     envMock.setenv('CI_COMMIT_REF_NAME', '_branch')
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     ciYaml = fileMock.load_file('.gitlab-ci.yml')
@@ -103,9 +102,9 @@ class KubeDevGenerateCITests(unittest.TestCase):
     envMock.setenv('CI_COMMIT_REF_NAME', '_branch')
 
     # ACT
-    sut = Kubedev('./templates/')
+    sut = Kubedev()
     sut.generate_from_config(
-        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock)
+        testDeploymentConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
 
     # ASSERT
     ciYaml = fileMock.load_file('.gitlab-ci.yml')
