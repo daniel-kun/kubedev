@@ -1,6 +1,7 @@
 - kubedev generate ✔
+- kubedev template ✔
 - kubedev check
 - kubedev build
 - kubedev push
-- kubedev template
 - kubedev deploy
+- kubedev template -> Trim down replicas to 1, because otherwise tilt's live-update will not work

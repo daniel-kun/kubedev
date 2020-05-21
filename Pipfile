@@ -7,6 +7,9 @@ verify_ssl = true
 autopep8 = "*"
 pylint = "*"
 rope = "*"
+setuptools = "*"
+wheel = "*"
+twine = "*"
 
 [packages]
 pyyaml = "*"
