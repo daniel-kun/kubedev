@@ -23,7 +23,7 @@ def add_common_arguments(argParser):
       '-c', '--config', help='Path to config file', required=False, default='kubedev.json')
 
 
-if __name__ == '__main__':
+def main(argv):
   generatorArgParser = argparse.ArgumentParser()
   add_common_arguments(generatorArgParser)
 
@@ -69,11 +69,15 @@ if __name__ == '__main__':
       'help': print_help
   }
 
-  if len(sys.argv) < 2:
+  if len(argv) < 2:
     print_help([])
   else:
-    command = sys.argv[1]
+    command = argv[1]
     if command not in commands:
-      print_help(sys.argv[2:])
+      print_help(argv[2:])
     else:
-      commands[command](sys.argv[2:])
+      commands[command](argv[2:])
+
+
+if __name__ == '__main__':
+  main(sys.argv)
