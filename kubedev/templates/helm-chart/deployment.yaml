@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: %%KUBEDEV_DEPLOYMENT_NAME%% # OVERWRITE
@@ -7,6 +7,10 @@ metadata:
     kubedev-deployment: %%KUBEDEV_DEPLOYMENT_NAME%% # OVERWRITE
 spec:
   replicas: %%KUBEDEV_DEPLOYMENT_REPLICAS%% # OVERWRITE
+  selector:
+    matchLabels:
+      kubedev-app: %%KUBEDEV_PROJECT_NAME%% # OVERWRITE
+      kubedev-deployment: %%KUBEDEV_DEPLOYMENT_NAME%% # OVERWRITE
   strategy:
     type: RollingUpdate
     rollingUpdate:
