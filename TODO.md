@@ -1,8 +1,11 @@
+- kubedev generate -> Add docker credentials/config (idea: add a --ci parameter to all commands used in CI)
+- kubedev template -> Trim down replicas to 1, because otherwise tilt's live-update will not work
+- kubedev check -> Print out the env documentation for missing env vars
+- kubedev check -> Add a paramter to check only env vars for a specific deployment
+- kubedev check ✔
 - kubedev generate ✔
 - kubedev template ✔
 - kubedev build ✔
 - kubedev deploy ✔
 - kubedev push ✔
-- kubedev check
-- kubedev generate -> Remove --tag parameters
-- kubedev template -> Trim down replicas to 1, because otherwise tilt's live-update will not work
+- kubedev generate -> Remove --tag parameters ✔
