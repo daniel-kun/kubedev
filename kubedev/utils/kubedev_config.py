@@ -19,14 +19,14 @@ class KubedevConfig:
     Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
     from a kubedev config. 
     '''
-    if 'required-envs' in kubedev:
-      envs = set(kubedev['required-envs'].keys())
-    else:
-      envs = set()
+    envs = set(KubedevConfig.load_envs(
+        kubedev, build=False, container=True).keys())
     if 'deployments' in kubedev:
       for (_, deployment) in kubedev['deployments'].items():
+        envs = {*envs, }
         if 'required-envs' in deployment:
-          envs = {*envs, *set(deployment['required-envs'].keys())}
+          envs = {
+              *envs, *set(KubedevConfig.load_envs(deployment, build=False, container=True).keys())}
 
     if len(envs) > 0:
       return ' ' + ' '.join([f'--set {e}="${{{e}}}"' for e in sorted(envs)])
@@ -45,3 +45,37 @@ class KubedevConfig:
     else:
       file_accessor.save_file(kubeconfig_temp_path, cfg, True)
       return kubeconfig_temp_path
+
+  @staticmethod
+  def load_envs(source, build, container):
+    """
+    Returns a dict of environment variable definitions from `source', filtered for env vars that
+    are declared for build and/or container, depending on `build' and `container's values (True/False).
+
+    :param source: The object that contains a dict of environment variables
+    :param build: True, when env vars with either `"build": true' or without a "build" property
+    :param container: True, when env vars with either `"container": true' or without a "container" property
+    """
+
+    def _use_env(source, use, useField):
+      """
+      Returns True when use is True and either useField exists in source and is True or useField does not exist in source.
+      """
+      if useField in source:
+        return use and source[useField]
+      else:
+        return use
+
+    envs = source['required-envs'] if 'required-envs' in source else dict()
+    return {key: content for key, content in envs.items() if _use_env(content, build, "build") or _use_env(content, container, "container")}
+
+  @staticmethod
+  def get_images(kubedev):
+    images = dict()
+    globalEnvs = KubedevConfig.load_envs(kubedev, True, False)
+    if "deployments" in kubedev:
+      for deploymentKey, deployment in kubedev["deployments"].items():
+        images[deploymentKey] = {
+            "required-envs": {*globalEnvs, *KubedevConfig.load_envs(deployment, True, False)}
+        }
+    return images

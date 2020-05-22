@@ -1,7 +1,8 @@
 import unittest
 
 from kubedev.utils import KubedevConfig, kubeconfig_temp_path
-from test_utils import EnvMock, FileMock, testDeploymentConfig
+from test_utils import (EnvMock, FileMock, testDeploymentConfig,
+                        testMultiDeploymentsConfig)
 
 
 class KubedevConfigTests(unittest.TestCase):
@@ -37,3 +38,21 @@ class KubedevConfigTests(unittest.TestCase):
     self.assertEqual(kubeconfig_temp_path, kubeConfigPath)
     kubeConfig = files.load_file(kubeConfigPath)
     self.assertEqual(kubeConfig, kubeConfigContent)
+
+  def test_get_images(self):
+    images = KubedevConfig.get_images(testMultiDeploymentsConfig)
+    self.assertIn("foo-deploy", images)
+    fooDeploy = images["foo-deploy"]
+    self.assertIn("required-envs", fooDeploy)
+    fooRequiredEnvs = fooDeploy["required-envs"]
+    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", fooRequiredEnvs)
+    self.assertIn("FOO_SERVICE_DEPLOY_ENV1", fooRequiredEnvs)
+    self.assertEqual(2, len(fooRequiredEnvs))
+
+    self.assertIn("bar-deploy", images)
+    barDeploy = images["bar-deploy"]
+    self.assertIn("required-envs", barDeploy)
+    barRequiredEnvs = barDeploy["required-envs"]
+    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", barRequiredEnvs)
+    self.assertIn("BAR_SERVICE_DEPLOY_ENV2", barRequiredEnvs)
+    self.assertEqual(2, len(barRequiredEnvs))

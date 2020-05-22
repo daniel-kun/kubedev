@@ -8,6 +8,11 @@ testDeploymentConfig = {
         "FOO_SERVICE_GLOBAL_ENV1": {
             "documentation": "Test env var #1 (global)"
         },
+        "FOO_SERVICE_GLOBAL_ENV2": {
+            "documentation": "Test env var #1 (global)",
+            "build": True,
+            "container": False
+        },
     },
     "deployments": {
         "foo-deploy": {
@@ -28,7 +33,12 @@ testDeploymentConfig = {
                     "documentation": "Test env var #1"
                 },
                 "FOO_SERVICE_DEPLOY_ENV2": {
-                    "documentation": "Test env var #2"
+                    "documentation": "Test env var #2",
+                    "container": True
+                },
+                "FOO_SERVICE_DEPLOY_ENV3": {
+                    "build": True,
+                    "container": False
                 }
             }
         }
@@ -42,7 +52,8 @@ testMultiDeploymentsConfig = {
     "imageRegistry": "foo-registry",
     "required-envs": {
         "FOO_SERVICE_GLOBAL_ENV1": {
-            "documentation": "Test env var #1 (global)"
+            "documentation": "Test env var #1 (global)",
+            "build": False
         },
         "FOO_SERVICE_GLOBAL_ENV2": {
             "documentation": "Test env var #2 (global)"
@@ -67,7 +78,8 @@ testMultiDeploymentsConfig = {
                     "documentation": "Test env var #1, service 'foo-deploy'"
                 },
                 "FOO_SERVICE_DEPLOY_ENV2": {
-                    "documentation": "Test env var #2, service 'foo-deploy'"
+                    "documentation": "Test env var #2, service 'foo-deploy'",
+                    "build": False
                 }
             }
         },
@@ -86,7 +98,8 @@ testMultiDeploymentsConfig = {
             },
             "required-envs": {
                 "BAR_SERVICE_DEPLOY_ENV1": {
-                    "documentation": "Test env var #1, service 'bar-deploy'"
+                    "documentation": "Test env var #1, service 'bar-deploy'",
+                    "build": False
                 },
                 "BAR_SERVICE_DEPLOY_ENV2": {
                     "documentation": "Test env var #2, service 'bar-deploy'"

@@ -108,7 +108,7 @@ class Kubedev:
 
     variables = KubedevConfig.get_global_variables(kubedev)
 
-    envs = kubedev['required-envs'] if 'required-envs' in kubedev else dict()
+    envs = KubedevConfig.load_envs(kubedev, build=False, container=True)
 
     chartYamlTemplatePath = path.join('helm-chart', 'Chart.yaml')
     file_accessor.save_file(path.join(
@@ -144,7 +144,7 @@ class Kubedev:
           port for (portName, port) in ports.items() if 'service' in port and 'container' in port]
       print(f'    🔱 Writing deployment {finalDeploymentName}' +
             ' (with service)' if len(servicePorts) > 0 else '')
-      deployEnvs = value['required-envs'] if 'required-envs' in value else dict()
+      deployEnvs = KubedevConfig.load_envs(value, build=False, container=True)
       portForwards[deploymentName] = [
           {'dev': port['dev'], 'service': port['service']}
           for portName, port in ports.items()

@@ -6,6 +6,11 @@
   "required-envs": {
     "FOO_SERVICE_GLOBAL_ENV1": {
       "documentation": "Test env var #1 (global)"
+    },
+    "FOO_SERVICE_GLOBAL_ENV2": {
+      "documentation": "Test env var #1 (global)",
+      "build": true,
+      "container": false
     }
   },
   "deployments": {
@@ -27,7 +32,12 @@
           "documentation": "Test env var #1"
         },
         "FOO_SERVICE_DEPLOY_ENV2": {
-          "documentation": "Test env var #2"
+          "documentation": "Test env var #2",
+          "container": true
+        },
+        "FOO_SERVICE_DEPLOY_ENV3": {
+          "build": true,
+          "container": false
         }
       }
     }
