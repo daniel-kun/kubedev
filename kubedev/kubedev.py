@@ -57,25 +57,9 @@ def _replace_variables(text, variables):
   return text
 
 
-def _build_final_name(first, second):
-  if first == second:
-    return first
-  else:
-    return f'{first}-{second}'
-
-
 def _current_kubedev_docker_image():
   # TODO: Find out kubedev's own version number and put it here
   return 'kubedev/kubedev:1.0.0'
-
-
-def _get_tag(env_accessor):
-  commit, branch = (env_accessor.getenv('CI_COMMIT_SHORT_SHA'),
-                    env_accessor.getenv('CI_COMMIT_REF_NAME'))
-  if not isinstance(commit, type(None)) and not isinstance(branch, type(None)):
-    return f'{commit}_{branch}'
-  else:
-    return 'none'  # When outside of the CI environment, the tag usually will be overwritten by tilt anyways, so it is irrelevant
 
 
 class Kubedev:
@@ -138,7 +122,8 @@ class Kubedev:
     images = dict()  # Collect all images from deployments
     portForwards = dict()  # Collect all port-forwads for tilt
     for deploymentName, value in kubedev['deployments'].items():
-      finalDeploymentName = _build_final_name(projectName, deploymentName)
+      finalDeploymentName = KubedevConfig.collapse_names(
+          projectName, deploymentName)
       ports = value['ports'] if 'ports' in value else dict()
       servicePorts = [
           port for (portName, port) in ports.items() if 'service' in port and 'container' in port]
@@ -297,7 +282,7 @@ class Kubedev:
 
   def template_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
     variables = KubedevConfig.get_global_variables(kubedev)
-    tag = _get_tag(env_accessor)
+    tag = KubedevConfig.get_tag(env_accessor)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
     shell = env_accessor.getenv('SHELL')
     command = [
@@ -309,3 +294,20 @@ class Kubedev:
         KubedevConfig.get_helm_set_env_args(kubedev)
     ]
     shell_executor.execute(command, variables)
+
+  def build_from_config(self, kubedev, container, shell_executor, env_accessor):
+    shell = env_accessor.getenv('SHELL')
+    images = KubedevConfig.get_images(kubedev, env_accessor)
+    if not container in images:
+      raise KeyError(
+          f"Container {container} is not defined in kubedev config.")
+    else:
+      image = images[container]
+      call = [
+          shell,
+          '-c',
+          f"docker build -t {image['imageName']} " +
+          KubedevConfig.get_docker_build_args(image) +
+          f"{image['buildPath']}"
+      ]
+      shell_executor.execute(call, dict())

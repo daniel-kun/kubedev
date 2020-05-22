@@ -70,12 +70,51 @@ class KubedevConfig:
     return {key: content for key, content in envs.items() if _use_env(content, build, "build") or _use_env(content, container, "container")}
 
   @staticmethod
-  def get_images(kubedev):
+  def get_images(kubedev, env_accessor):
     images = dict()
     globalEnvs = KubedevConfig.load_envs(kubedev, True, False)
+    tag = KubedevConfig.get_tag(env_accessor)
+    imageRegistry = kubedev["imageRegistry"]
+    name = kubedev["name"]
     if "deployments" in kubedev:
       for deploymentKey, deployment in kubedev["deployments"].items():
+        finalDeploymentName = KubedevConfig.collapse_names(name, deploymentKey)
         images[deploymentKey] = {
+            "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
+            "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
             "required-envs": {*globalEnvs, *KubedevConfig.load_envs(deployment, True, False)}
         }
     return images
+
+  @staticmethod
+  def get_buildpath(app_name, image_name):
+    if app_name == image_name:
+      return "./"
+    else:
+      return f"./{image_name}/"
+
+  @staticmethod
+  def get_tag(env_accessor):
+    commit, branch = (env_accessor.getenv('CI_COMMIT_SHORT_SHA'),
+                      env_accessor.getenv('CI_COMMIT_REF_NAME'))
+    if not isinstance(commit, type(None)) and not isinstance(branch, type(None)):
+      return f'{commit}_{branch}'
+    else:
+      return 'none'  # When outside of the CI environment, the tag usually will be overwritten by tilt anyways, so it is irrelevant
+
+  @staticmethod
+  def collapse_names(first, second):
+    if first == second:
+      return first
+    else:
+      return f'{first}-{second}'
+
+  @staticmethod
+  def get_docker_build_args(image):
+    """
+    Returns a string with all "--build-arg ..." parameters to the "docker build ..." call.
+
+    :param image: One entry returned from KubedevConfig.get_images()
+    """
+    envs = image['required-envs']
+    return " ".join([f'--build-arg {env}="${{{env}}}"' for env in sorted(envs)]) + " "

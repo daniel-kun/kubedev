@@ -40,7 +40,8 @@ class KubedevConfigTests(unittest.TestCase):
     self.assertEqual(kubeConfig, kubeConfigContent)
 
   def test_get_images(self):
-    images = KubedevConfig.get_images(testMultiDeploymentsConfig)
+    images = KubedevConfig.get_images(
+        testMultiDeploymentsConfig, env_accessor=EnvMock())
     self.assertIn("foo-deploy", images)
     fooDeploy = images["foo-deploy"]
     self.assertIn("required-envs", fooDeploy)
@@ -48,6 +49,11 @@ class KubedevConfigTests(unittest.TestCase):
     self.assertIn("FOO_SERVICE_GLOBAL_ENV2", fooRequiredEnvs)
     self.assertIn("FOO_SERVICE_DEPLOY_ENV1", fooRequiredEnvs)
     self.assertEqual(2, len(fooRequiredEnvs))
+    self.assertIn("imageName", fooDeploy)
+    self.assertEqual(
+        "foo-registry/foo-service-foo-deploy:none", fooDeploy["imageName"])
+    self.assertIn("buildPath", fooDeploy)
+    self.assertEqual("./foo-deploy/", fooDeploy["buildPath"])
 
     self.assertIn("bar-deploy", images)
     barDeploy = images["bar-deploy"]
@@ -56,3 +62,22 @@ class KubedevConfigTests(unittest.TestCase):
     self.assertIn("FOO_SERVICE_GLOBAL_ENV2", barRequiredEnvs)
     self.assertIn("BAR_SERVICE_DEPLOY_ENV2", barRequiredEnvs)
     self.assertEqual(2, len(barRequiredEnvs))
+    self.assertIn("imageName", barDeploy)
+    self.assertEqual(
+        "foo-registry/foo-service-bar-deploy:none", barDeploy["imageName"])
+    self.assertIn("buildPath", barDeploy)
+    self.assertEqual("./bar-deploy/", barDeploy["buildPath"])
+
+  def test_get_images_collapsed(self):
+    config = testDeploymentConfig.copy()
+    config['name'] = 'foo-deploy'
+    images = KubedevConfig.get_images(config, env_accessor=EnvMock())
+    self.assertIn('foo-deploy', images)
+    deploy = images['foo-deploy']
+    self.assertIn('imageName', deploy)
+    self.assertEqual('foo-registry/foo-deploy:none', deploy['imageName'])
+    self.assertIn('buildPath', deploy)
+    self.assertEqual('./', deploy['buildPath'])
+
+  def test_get_images_in_ci(self):
+    self.skipTest("Test must be implemented")
