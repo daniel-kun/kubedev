@@ -51,3 +51,14 @@ class TemplateMock:
   def load_template(self, file):
     with open(os.path.join('kubedev', 'templates', file), 'br') as f:
       return f.read()
+
+
+class OutputMock:
+  def __init__(self):
+    self._prints = []
+
+  def print(self, message, isError):
+    self._prints.append({"message": message, "isError": isError})
+
+  def messages(self):
+    return self._prints

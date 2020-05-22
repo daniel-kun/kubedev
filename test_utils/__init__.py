@@ -1,2 +1,3 @@
 from .configs import testDeploymentConfig, testMultiDeploymentsConfig
-from .mocks import EnvMock, FileMock, ShellExecutorMock, TemplateMock
+from .mocks import (EnvMock, FileMock, OutputMock, ShellExecutorMock,
+                    TemplateMock)

@@ -14,11 +14,7 @@ class KubedevConfig:
     }
 
   @staticmethod
-  def get_helm_set_env_args(kubedev):
-    '''
-    Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
-    from a kubedev config. 
-    '''
+  def get_all_env_names(kubedev, build, container):
     envs = set(KubedevConfig.load_envs(
         kubedev, build=False, container=True).keys())
     if 'deployments' in kubedev:
@@ -27,6 +23,15 @@ class KubedevConfig:
         if 'required-envs' in deployment:
           envs = {
               *envs, *set(KubedevConfig.load_envs(deployment, build=False, container=True).keys())}
+    return envs
+
+  @staticmethod
+  def get_helm_set_env_args(kubedev):
+    '''
+    Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
+    from a kubedev config. 
+    '''
+    envs = KubedevConfig.get_all_env_names(kubedev, False, True)
 
     if len(envs) > 0:
       return ' ' + ' '.join([f'--set {e}="${{{e}}}"' for e in sorted(envs)])

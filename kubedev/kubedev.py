@@ -47,6 +47,14 @@ class RealTemplateAccessor:
     return pkg_resources.resource_string(__name__, path.join('templates', file))
 
 
+class RealPrinter:
+  def print(self, message, isError):
+    if isError:
+      print(message, file=sys.stderr)
+    else:
+      print(message, file=sys.stdout)
+
+
 def _load_template(file, variables, template_accessor):
   content = template_accessor.load_template(file)
   return _replace_variables(content.decode('utf-8'), variables)
@@ -345,3 +353,39 @@ class Kubedev:
           f"docker push {image['imageName']}"
       ]
       shell_executor.execute(call, dict())
+
+  def check(self, configFileName, env_accessor=RealEnvAccessor(), printer=RealPrinter()):
+    self.check_from_config(
+        self._load_config(configFileName), env_accessor=env_accessor, printer=printer)
+
+  def check_from_config(self, kubedev, env_accessor, printer):
+    result = True
+
+    if not 'name' in kubedev:
+      printer.print(
+          '❌ Required field "name" is missing in kubedev.json', True)
+      result = False
+
+    if not 'imageRegistry' in kubedev:
+      printer.print(
+          '❌ Required field "imageRegistry" is missing in kubedev.json', True)
+      result = False
+
+    if not 'imagePullSecrets' in kubedev:
+      printer.print(
+          '❌ Required field "imagePullSecrets" is missing in kubedev.json', True)
+      result = False
+
+    envs = KubedevConfig.get_all_env_names(kubedev, True, True)
+    for env in sorted(envs):
+      if isinstance(env_accessor.getenv(env), type(None)):
+        printer.print(
+            f'❌ Required environment variable "{env}" is not defined', True)
+        result = False
+
+    if result:
+      print('🎉🥳  Yay, all environment variables are set and kubedev.json is well-formed! 🥳🎉')
+      print('🎉🥳                              !!! DEV ON !!!                              🥳🎉')
+    else:
+      print('❌ Check failed')
+    return result
