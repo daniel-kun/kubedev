@@ -90,8 +90,8 @@ class KubeDevGenerateCITests(unittest.TestCase):
     self.assertIn('script', job)
     self.assertListEqual(
         ['kubedev check',
-         'kubedev build foo-deploy --tag ${DOCKER_TAG}',
-         'kubedev push foo-deploy --tag ${DOCKER_TAG}'],
+         'kubedev build foo-deploy',
+         'kubedev push foo-deploy'],
         job['script'])
 
   def test_ci_deploy(self):
@@ -108,7 +108,6 @@ class KubeDevGenerateCITests(unittest.TestCase):
 
     # ASSERT
     ciYaml = fileMock.load_file('.gitlab-ci.yml')
-    print(ciYaml)
     self.assertIsNotNone(ciYaml)
     ci = yaml.safe_load(ciYaml)
     self.assertIn('deploy', ci)
@@ -118,7 +117,7 @@ class KubeDevGenerateCITests(unittest.TestCase):
     self.assertIn('script', job)
     self.assertListEqual(
         ['kubedev check',
-         'kubedev deploy --version ${CI_PIPELINE_IID} --tag ${DOCKER_TAG}'],
+         'kubedev deploy --version ${CI_PIPELINE_IID}'],
         job['script'])
     self.assertIn('variables', job)
     self.assertIn('KUBEDEV_TAG', job['variables'])

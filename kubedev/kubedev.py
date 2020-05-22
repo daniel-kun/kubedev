@@ -226,8 +226,8 @@ class Kubedev:
             'image': _current_kubedev_docker_image(),
             'script': [
                 'kubedev check',
-                f'kubedev build {imageKey} --tag ${{DOCKER_TAG}}',
-                f'kubedev push {imageKey} --tag ${{DOCKER_TAG}}'
+                f'kubedev build {imageKey}',
+                f'kubedev push {imageKey}'
             ],
             'variables': {
                 'KUBEDEV_TAG': '${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}'
@@ -240,7 +240,7 @@ class Kubedev:
           'image': _current_kubedev_docker_image(),
           'script': [
               'kubedev check',
-              'kubedev deploy --version ${CI_PIPELINE_IID} --tag ${DOCKER_TAG}'
+              'kubedev deploy --version ${CI_PIPELINE_IID}'
           ],
           'variables': {
               'KUBEDEV_TAG': '${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}'
