@@ -43,7 +43,7 @@ class KubeDevGenerateDeploymentTests(unittest.TestCase):
     self.assertIsNotNone(
         testDeployYaml, 'helm-chart/templates/deployments/foo-deploy.yaml was not generated.')
     testDeploy = yaml.safe_load(testDeployYaml)
-    self.assertEqual(testDeploy['apiVersion'], 'extensions/v1beta1')
+    self.assertEqual(testDeploy['apiVersion'], 'apps/v1')
     self.assertEqual(testDeploy['kind'], 'Deployment')
     self.assertEqual(testDeploy['metadata']['name'], "foo-service-foo-deploy")
     labels = testDeploy['metadata']['labels']
