@@ -326,3 +326,22 @@ class Kubedev:
           f"{image['buildPath']}"
       ]
       shell_executor.execute(call, dict())
+
+  def push(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
+    self.push_from_config(
+        self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
+
+  def push_from_config(self, kubedev, container, shell_executor, env_accessor):
+    shell = env_accessor.getenv('SHELL')
+    images = KubedevConfig.get_images(kubedev, env_accessor)
+    if not container in images:
+      raise KeyError(
+          f"Container {container} is not defined in kubedev config.")
+    else:
+      image = images[container]
+      call = [
+          shell,
+          '-c',
+          f"docker push {image['imageName']} "
+      ]
+      shell_executor.execute(call, dict())

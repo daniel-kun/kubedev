@@ -39,6 +39,11 @@ def main():
   buildArgParser.add_argument('container', metavar='Container', type=str,
                               help="The name of the deployment to build the container for.")
 
+  pushArgParser = argparse.ArgumentParser()
+  add_common_arguments(pushArgParser)
+  pushArgParser.add_argument('container', metavar='Container', type=str,
+                             help="The name of the deployment to push the container image for.")
+
   def print_help(argv):
     print('HELP: TODO')
 
@@ -62,10 +67,16 @@ def main():
     kubedev = Kubedev()
     kubedev.build(args.config, args.container)
 
+  def push(argv):
+    args = pushArgParser.parse_args(argv)
+    kubedev = Kubedev()
+    kubedev.push(args.config, args.container)
+
   commands = {
       'generate': generate,
       'template': template,
       'build': build,
+      'push': push,
       'deploy': deploy,
       'help': print_help
   }
