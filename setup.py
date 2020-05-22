@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="kubedev",
-    version=f"0.0.{os.getenv('TRAVIS_JOB_ID')}",
+    version=f"0.2.{os.getenv('TRAVIS_JOB_ID')}",
     author="Daniel Albuschat",
     author_email="d.albuschat@gmail.com",
     description="Kubernetes development workflow made easy",

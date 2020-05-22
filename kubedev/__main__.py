@@ -30,6 +30,9 @@ if __name__ == '__main__':
   templateArgParser = argparse.ArgumentParser()
   add_common_arguments(templateArgParser)
 
+  deployArgParser = argparse.ArgumentParser()
+  add_common_arguments(deployArgParser)
+
   buildArgParser = argparse.ArgumentParser()
   add_common_arguments(buildArgParser)
   buildArgParser.add_argument('container', metavar='Container', type=str,
@@ -48,6 +51,11 @@ if __name__ == '__main__':
     kubedev = Kubedev()
     kubedev.template(args.config)
 
+  def deploy(argv):
+    args = deployArgParser.parse_args(argv)
+    kubedev = Kubedev()
+    kubedev.deploy(args.config)
+
   def build(argv):
     args = buildArgParser.parse_args(argv)
     kubedev = Kubedev()
@@ -57,6 +65,7 @@ if __name__ == '__main__':
       'generate': generate,
       'template': template,
       'build': build,
+      'deploy': deploy,
       'help': print_help
   }
 

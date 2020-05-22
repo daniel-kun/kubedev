@@ -7,9 +7,9 @@ from test_utils import (EnvMock, FileMock, ShellExecutorMock,
                         testDeploymentConfig, testMultiDeploymentsConfig)
 
 
-class KubeDevTemplateTests(unittest.TestCase):
+class KubeDevDeployTests(unittest.TestCase):
 
-  def test_template_single_deployment_non_ci(self):
+  def test_deploy_single_deployment_non_ci(self):
     # ARRANGE
     shell = ShellExecutorMock()
     env = EnvMock()
@@ -22,7 +22,7 @@ class KubeDevTemplateTests(unittest.TestCase):
 
     # ACT
     sut = Kubedev()
-    sut.template_from_config(testDeploymentConfig, shell, env, files)
+    sut.deploy_from_config(testDeploymentConfig, shell, env, files)
 
     # ASSERT
     shellCalls = shell.calls()
@@ -30,13 +30,13 @@ class KubeDevTemplateTests(unittest.TestCase):
     self.assertListEqual([
         '/bin/sh',
         '-c',
-        'helm template ./helm-chart/ --kubeconfig ' +
+        'helm upgrade foo-service ./helm-chart/ --install --wait --kubeconfig ' +
         '/home/kubedev/.kube/config --kube-context kubedev-ctx ' +
         '--set KUBEDEV_TAG="none" ' +
         '--set FOO_SERVICE_DEPLOY_ENV1="${FOO_SERVICE_DEPLOY_ENV1}" --set FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}" --set FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"'
     ], shellCalls[0]['cmd'])
 
-  def test_template_multiple_deployments_in_ci(self):
+  def test_deploy_multiple_deployments_in_ci(self):
     # ARRANGE
     shell = ShellExecutorMock()
     env = EnvMock()
@@ -56,7 +56,7 @@ lkasjfjklsdflkj:
 
     # ACT
     sut = Kubedev()
-    sut.template_from_config(testMultiDeploymentsConfig, shell, env, files)
+    sut.deploy_from_config(testMultiDeploymentsConfig, shell, env, files)
 
     # ASSERT
     shellCalls = shell.calls()
@@ -64,7 +64,7 @@ lkasjfjklsdflkj:
     self.assertListEqual([
         '/bin/sh',
         '-c',
-        'helm template ./helm-chart/ --kubeconfig ' +
+        'helm upgrade foo-service ./helm-chart/ --install --wait --kubeconfig ' +
         f'{kubeconfig_temp_path} --kube-context kubedev-ctx ' +
         '--set KUBEDEV_TAG="shortsha_branchname" ' +
         '--set BAR_SERVICE_DEPLOY_ENV1="${BAR_SERVICE_DEPLOY_ENV1}" --set BAR_SERVICE_DEPLOY_ENV2="${BAR_SERVICE_DEPLOY_ENV2}" ' +

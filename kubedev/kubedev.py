@@ -273,15 +273,11 @@ class Kubedev:
       dockerfile = f'{imageKey}/Dockerfile'
       file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
 
-  def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
-    self.template_from_config(
-        self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
-
   def _get_kubecontext_arg(self, env_accessor):
     e = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
     return f'--kube-context {e}' if e != None and isinstance(e, str) and e != '' else ' '
 
-  def template_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
+  def _template_or_deploy(self, kubedev, command, shell_executor, env_accessor, file_accessor):
     variables = KubedevConfig.get_global_variables(kubedev)
     tag = KubedevConfig.get_tag(env_accessor)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
@@ -289,12 +285,26 @@ class Kubedev:
     command = [
         shell,
         '-c',
-        f'helm template ./helm-chart/ --name {kubedev["name"]} ' +
+        f'helm {command} ' +
         f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
         f'--set KUBEDEV_TAG="{tag}"' +
         KubedevConfig.get_helm_set_env_args(kubedev)
     ]
     shell_executor.execute(command, variables)
+
+  def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
+    self.template_from_config(
+        self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
+
+  def template_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
+    return self._template_or_deploy(kubedev, "template ./helm-chart/", shell_executor, env_accessor, file_accessor)
+
+  def deploy(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
+    self.deploy_from_config(
+        self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
+
+  def deploy_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
+    return self._template_or_deploy(kubedev, f"upgrade {kubedev['name']} ./helm-chart/ --install --wait", shell_executor, env_accessor, file_accessor)
 
   def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     self.build_from_config(

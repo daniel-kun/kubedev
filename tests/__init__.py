@@ -1,4 +1,5 @@
 from .build_test import KubeDevBuildTests
+from .deploy_test import KubeDevDeployTests
 from .generate_ci_test import KubeDevGenerateCITests
 from .generate_deployment_test import KubeDevGenerateDeploymentTests
 from .template_test import KubeDevTemplateTests
