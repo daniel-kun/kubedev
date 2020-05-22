@@ -342,6 +342,6 @@ class Kubedev:
       call = [
           shell,
           '-c',
-          f"docker push {image['imageName']} "
+          f"docker push {image['imageName']}"
       ]
       shell_executor.execute(call, dict())

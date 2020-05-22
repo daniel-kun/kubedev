@@ -14,8 +14,8 @@ class KubeDevPushTests(unittest.TestCase):
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
-    sut.build_from_config(testMultiDeploymentsConfig, 'foo-deploy',
-                          shell_executor=shellMock, env_accessor=envMock)
+    sut.push_from_config(testMultiDeploymentsConfig, 'foo-deploy',
+                         shell_executor=shellMock, env_accessor=envMock)
 
     calls = shellMock.calls()
     self.assertGreaterEqual(len(calls), 1)
