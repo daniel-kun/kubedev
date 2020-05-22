@@ -1,6 +1,7 @@
 import json
 import pathlib
 import subprocess
+import sys
 from io import StringIO
 from os import environ, getenv, path
 
@@ -32,7 +33,7 @@ class RealFileAccessor:
 class RealShellExecutor:
   def execute(self, commandWithArgs, envVars):
     print(
-        f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})')
+        f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})', file=sys.stderr)
     return subprocess.run(commandWithArgs, env={**environ, **envVars})
 
 
@@ -294,6 +295,10 @@ class Kubedev:
         KubedevConfig.get_helm_set_env_args(kubedev)
     ]
     shell_executor.execute(command, variables)
+
+  def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
+    self.build_from_config(
+        self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
 
   def build_from_config(self, kubedev, container, shell_executor, env_accessor):
     shell = env_accessor.getenv('SHELL')

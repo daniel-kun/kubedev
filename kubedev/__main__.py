@@ -30,6 +30,11 @@ if __name__ == '__main__':
   templateArgParser = argparse.ArgumentParser()
   add_common_arguments(templateArgParser)
 
+  buildArgParser = argparse.ArgumentParser()
+  add_common_arguments(buildArgParser)
+  buildArgParser.add_argument('container', metavar='Container', type=str,
+                              help="The name of the deployment to build the container for.")
+
   def print_help(argv):
     print('HELP: TODO')
 
@@ -43,9 +48,15 @@ if __name__ == '__main__':
     kubedev = Kubedev()
     kubedev.template(args.config)
 
+  def build(argv):
+    args = buildArgParser.parse_args(argv)
+    kubedev = Kubedev()
+    kubedev.build(args.config, args.container)
+
   commands = {
       'generate': generate,
       'template': template,
+      'build': build,
       'help': print_help
   }
 
