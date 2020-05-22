@@ -5,9 +5,13 @@ import setuptools
 with open("README.md", "r") as fh:
   long_description = fh.read()
 
+buildVersion = os.getenv('TRAVIS_JOB_ID')
+if isinstance(buildVersion, type(None)):
+  buildVersion = "99"  # Fake local dev version
+
 setuptools.setup(
     name="kubedev",
-    version=f"0.4.{os.getenv('TRAVIS_JOB_ID')}",
+    version=f"0.5.{buildVersion}",
     author="Daniel Albuschat",
     author_email="d.albuschat@gmail.com",
     description="Kubernetes development workflow made easy",
