@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="kubedev",
-    version=f"0.3.{os.getenv('TRAVIS_JOB_ID')}",
+    version=f"0.4.{os.getenv('TRAVIS_JOB_ID')}",
     author="Daniel Albuschat",
     author_email="d.albuschat@gmail.com",
     description="Kubernetes development workflow made easy",
@@ -23,6 +23,9 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    entry_points={
+        'console_scripts': ['kubedev=kubedev:main'],
+    },
     install_requires=[
         'pyyaml',
         'ruamel-yaml'
