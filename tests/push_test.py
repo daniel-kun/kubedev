@@ -70,7 +70,6 @@ class KubeDevPushTests(unittest.TestCase):
 
     calls = shellMock.calls()
     self.assertGreaterEqual(len(calls), 1)
-    print(calls[0]["cmd"])
     self.assertListEqual([
         '/bin/bash',
         '-c',

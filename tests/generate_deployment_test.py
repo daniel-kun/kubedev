@@ -43,7 +43,6 @@ class KubeDevGenerateDeploymentTests(unittest.TestCase):
     self.assertIsNotNone(
         testDeployYaml, 'helm-chart/templates/deployments/foo-deploy.yaml was not generated.')
     testDeploy = yaml.safe_load(testDeployYaml)
-    print(testDeployYaml)
     self.assertEqual(testDeploy['apiVersion'], 'extensions/v1beta1')
     self.assertEqual(testDeploy['kind'], 'Deployment')
     self.assertEqual(testDeploy['metadata']['name'], "foo-service-foo-deploy")
@@ -74,7 +73,6 @@ class KubeDevGenerateDeploymentTests(unittest.TestCase):
     # ASSERT
     testDeployYaml = fileMock.load_file(
         'helm-chart/templates/deployments/foo-deploy.yaml')
-    print(testDeployYaml)
     testDeploy = yaml.safe_load(testDeployYaml)
     container0 = testDeploy['spec']['template']['spec']['containers'][0]
     self.assertIn('env', container0)
@@ -119,7 +117,6 @@ class KubeDevGenerateDeploymentTests(unittest.TestCase):
     testDeployYaml = fileMock.load_file(
         'helm-chart/templates/deployments/foo-service.yaml')
     testDeploy = yaml.safe_load(testDeployYaml)
-    print(testDeployYaml)
     self.assertEqual(testDeploy['metadata']['name'], "foo-service")
     labels = testDeploy['metadata']['labels']
     self.assertEqual(labels['kubedev-app'], "foo-service")
@@ -149,7 +146,6 @@ class KubeDevGenerateDeploymentTests(unittest.TestCase):
     testDeployYaml = fileMock.load_file(
         'helm-chart/templates/deployments/foo-deploy.yaml')
     testDeploy = yaml.safe_load(testDeployYaml)
-    print(testDeployYaml)
     container0 = testDeploy['spec']['template']['spec']['containers'][0]
     self.assertIn('ports', container0)
     ports = container0['ports']
@@ -196,7 +192,6 @@ spec:
     testServiceYaml = fileMock.load_file(
         'helm-chart/templates/deployments/foo-service_service.yaml')
     self.assertIsNotNone(testServiceYaml)
-    print(testServiceYaml)
     self.assertEqual('''apiVersion: v3
 kind: Srv
 metadata:
