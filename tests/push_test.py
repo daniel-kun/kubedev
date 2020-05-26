@@ -10,7 +10,6 @@ class KubeDevPushTests(unittest.TestCase):
 
   def test_push_multi_deployment_foo(self):
     envMock = EnvMock()
-    envMock.setenv('SHELL', '/bin/bash')
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
@@ -20,7 +19,7 @@ class KubeDevPushTests(unittest.TestCase):
     calls = shellMock.calls()
     self.assertGreaterEqual(len(calls), 1)
     self.assertListEqual([
-        '/bin/bash',
+        '/bin/sh',
         '-c',
         'docker push foo-registry/foo-service-foo-deploy:none'
     ], calls[0]['cmd'])
@@ -28,7 +27,6 @@ class KubeDevPushTests(unittest.TestCase):
 
   def test_push_multi_deployment_bar(self):
     envMock = EnvMock()
-    envMock.setenv('SHELL', '/bin/bash')
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
@@ -38,7 +36,7 @@ class KubeDevPushTests(unittest.TestCase):
     calls = shellMock.calls()
     self.assertGreaterEqual(len(calls), 1)
     self.assertListEqual([
-        '/bin/bash',
+        '/bin/sh',
         '-c',
         'docker push foo-registry/foo-service-bar-deploy:none'
     ], calls[0]['cmd'])
@@ -46,7 +44,6 @@ class KubeDevPushTests(unittest.TestCase):
 
   def test_push_invalid_container(self):
     envMock = EnvMock()
-    envMock.setenv('SHELL', '/bin/bash')
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
@@ -55,7 +52,6 @@ class KubeDevPushTests(unittest.TestCase):
 
   def test_push_single_collapsedname_deployment_foo(self):
     envMock = EnvMock()
-    envMock.setenv('SHELL', '/bin/bash')
     shellMock = ShellExecutorMock()
     config = testDeploymentConfig.copy()
     # Set the global app name to the same name as the deployment,
@@ -71,7 +67,7 @@ class KubeDevPushTests(unittest.TestCase):
     calls = shellMock.calls()
     self.assertGreaterEqual(len(calls), 1)
     self.assertListEqual([
-        '/bin/bash',
+        '/bin/sh',
         '-c',
         'docker push foo-registry/foo-deploy:none'
     ], calls[0]['cmd'])

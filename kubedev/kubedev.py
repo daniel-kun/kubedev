@@ -289,9 +289,8 @@ class Kubedev:
     variables = KubedevConfig.get_global_variables(kubedev)
     tag = KubedevConfig.get_tag(env_accessor)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
-    shell = env_accessor.getenv('SHELL')
     command = [
-        shell,
+        '/bin/sh',
         '-c',
         f'helm {command} ' +
         f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
@@ -319,7 +318,6 @@ class Kubedev:
         self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
 
   def build_from_config(self, kubedev, container, shell_executor, env_accessor):
-    shell = env_accessor.getenv('SHELL')
     images = KubedevConfig.get_images(kubedev, env_accessor)
     if not container in images:
       raise KeyError(
@@ -327,7 +325,7 @@ class Kubedev:
     else:
       image = images[container]
       call = [
-          shell,
+          '/bin/sh',
           '-c',
           f"docker build -t {image['imageName']} " +
           KubedevConfig.get_docker_build_args(image) +
@@ -340,7 +338,6 @@ class Kubedev:
         self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
 
   def push_from_config(self, kubedev, container, shell_executor, env_accessor):
-    shell = env_accessor.getenv('SHELL')
     images = KubedevConfig.get_images(kubedev, env_accessor)
     if not container in images:
       raise KeyError(
@@ -348,7 +345,7 @@ class Kubedev:
     else:
       image = images[container]
       call = [
-          shell,
+          '/bin/sh',
           '-c',
           f"docker push {image['imageName']}"
       ]

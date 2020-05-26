@@ -14,7 +14,6 @@ class KubeDevDeployTests(unittest.TestCase):
     shell = ShellExecutorMock()
     env = EnvMock()
     env.setenv('HOME', '/home/kubedev')
-    env.setenv('SHELL', '/bin/sh')
     env.setenv('KUBEDEV_KUBECONFIG', 'default')
     env.setenv('KUBEDEV_KUBECONTEXT', 'kubedev-ctx')
 
@@ -41,7 +40,6 @@ class KubeDevDeployTests(unittest.TestCase):
     shell = ShellExecutorMock()
     env = EnvMock()
     env.setenv('HOME', '/home/kubedev')
-    env.setenv('SHELL', '/bin/sh')
     kubeConfigContent = '''
 lkasjfjklsdflkj:
   foo: aksldajsf
