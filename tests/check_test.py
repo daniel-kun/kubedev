@@ -60,7 +60,41 @@ class KubeDevCheckTests(unittest.TestCase):
         testMultiDeploymentsConfig, env_accessor=envMock, printer=outputMock)
     self.assertFalse(result)
     messages = outputMock.messages()
+    print(messages)
     self.assertEqual(3, len(messages))
+    self.assertIn('not defined', messages[0]['message'].lower())
+
+  def test_check_env_tests_vars_with_build_or_container_set_to_false(self):
+    envMock = EnvMock()
+    outputMock = OutputMock()
+
+    sut = Kubedev()
+    result = sut.check_from_config(
+        {
+            "name": "test",
+            "imagePullSecrets": "foobar",
+            "imageRegistry": "foobar",
+            "required-envs": {
+                "XYZ": {
+                    "build": True,
+                    "container": False
+                }
+            },
+            "deployments": {
+                "test": {
+                    "required-envs": {
+                        "ABC": {
+                            "build": False,
+                            "container": True
+                        }
+                    }
+                }
+            }
+        }, env_accessor=envMock, printer=outputMock)
+    self.assertFalse(result)
+    messages = outputMock.messages()
+    print(messages)
+    self.assertEqual(2, len(messages))
     self.assertIn('not defined', messages[0]['message'].lower())
 
   def test_check_image_registry_missing(self):

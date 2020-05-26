@@ -16,13 +16,13 @@ class KubedevConfig:
   @staticmethod
   def get_all_env_names(kubedev, build, container):
     envs = set(KubedevConfig.load_envs(
-        kubedev, build=False, container=True).keys())
+        kubedev, build=build, container=container).keys())
     if 'deployments' in kubedev:
       for (_, deployment) in kubedev['deployments'].items():
-        envs = {*envs, }
-        if 'required-envs' in deployment:
-          envs = {
-              *envs, *set(KubedevConfig.load_envs(deployment, build=False, container=True).keys())}
+        deploymentEnvs = KubedevConfig.load_envs(
+            deployment, build=build, container=container)
+        envs = {
+            *envs, *set(deploymentEnvs.keys())}
     return envs
 
   @staticmethod
