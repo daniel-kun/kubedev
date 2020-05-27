@@ -1,3 +1,5 @@
+# coding=utf-8
+
 import json
 import pathlib
 import subprocess
@@ -73,9 +75,10 @@ def _current_kubedev_docker_image():
 
 class Kubedev:
 
-  def _load_config(self, configFileName):
-    with open(configFileName) as f:
-      return json.loads(f.read())
+  def _load_config(self, configFileName, file_accessor=RealFileAccessor()):
+    return json.loads(file_accessor.load_file(configFileName))
+    # with open(configFileName) as f:
+    #   return json.loads(f.read())
 
   def generate(self, configFileName, overwrite=False, file_accessor=RealFileAccessor(), env_accessor=RealEnvAccessor(), template_accessor=RealTemplateAccessor()):
     """
@@ -300,21 +303,21 @@ class Kubedev:
     shell_executor.execute(command, variables)
 
   def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
-    self.template_from_config(
+    return self.template_from_config(
         self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
 
   def template_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
     return self._template_or_deploy(kubedev, "template ./helm-chart/", shell_executor, env_accessor, file_accessor)
 
   def deploy(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
-    self.deploy_from_config(
+    return self.deploy_from_config(
         self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
 
   def deploy_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
     return self._template_or_deploy(kubedev, f"upgrade {kubedev['name']} ./helm-chart/ --install --wait", shell_executor, env_accessor, file_accessor)
 
   def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
-    self.build_from_config(
+    return self.build_from_config(
         self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
 
   def build_from_config(self, kubedev, container, shell_executor, env_accessor):
@@ -334,7 +337,7 @@ class Kubedev:
       shell_executor.execute(call, dict())
 
   def push(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
-    self.push_from_config(
+    return self.push_from_config(
         self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
 
   def push_from_config(self, kubedev, container, shell_executor, env_accessor):
@@ -351,29 +354,34 @@ class Kubedev:
       ]
       shell_executor.execute(call, dict())
 
-  def check(self, configFileName, env_accessor=RealEnvAccessor(), printer=RealPrinter()):
-    self.check_from_config(
-        self._load_config(configFileName), env_accessor=env_accessor, printer=printer)
+  def check(self, configFileName, commands, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_accessor=RealFileAccessor()):
+    return self.check_from_config(
+        self._load_config(configFileName, file_accessor), commands, env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
 
-  def check_from_config(self, kubedev, env_accessor, printer):
+  def check_from_config(self, kubedev, commands, env_accessor, printer, file_accessor):
+    def is_command(cmd):
+      return len(commands) == 0 or cmd in commands
+
     result = True
 
-    if not 'name' in kubedev:
-      printer.print(
-          '❌ Required field "name" is missing in kubedev.json', True)
-      result = False
+    if is_command('generate'):
+      if not 'name' in kubedev:
+        printer.print(
+            '❌ Required field "name" is missing in kubedev.json', True)
+        result = False
 
-    if not 'imageRegistry' in kubedev:
-      printer.print(
-          '❌ Required field "imageRegistry" is missing in kubedev.json', True)
-      result = False
+      if not 'imageRegistry' in kubedev:
+        printer.print(
+            '❌ Required field "imageRegistry" is missing in kubedev.json', True)
+        result = False
 
-    if not 'imagePullSecrets' in kubedev:
-      printer.print(
-          '❌ Required field "imagePullSecrets" is missing in kubedev.json', True)
-      result = False
+      if not 'imagePullSecrets' in kubedev:
+        printer.print(
+            '❌ Required field "imagePullSecrets" is missing in kubedev.json', True)
+        result = False
 
-    envs = KubedevConfig.get_all_env_names(kubedev, True, True)
+    envs = KubedevConfig.get_all_env_names(kubedev, build=is_command(
+        'build'), container=is_command('deploy') or is_command('template'))
     for env in sorted(envs):
       if isinstance(env_accessor.getenv(env), type(None)):
         printer.print(

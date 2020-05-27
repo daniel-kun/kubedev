@@ -1,13 +1,13 @@
-- kubedev generate -> Add docker credentials/config (idea: add a --ci parameter to all commands used in CI)
-- kubedev template -> Trim down replicas to 1, because otherwise tilt's live-update will not work
+- kubedev check -> Allow to check only for certain commands
+- kubedev check -> Check for KUBEDEV\_ system env card
 - kubedev check -> Print out the env documentation for missing env vars
 - kubedev check -> Add a paramter to check only env vars for a specific deployment
 - kubedev check -> Check for required command line tools
-- kubedev check -> Check for KUBEDEV\_ system env card
-- kubedev check -> Allow to check only for certain commands)
+- kubedev build/publish -> Add docker credentials/config (use env var "CI" to detect CI environment, and write a ~/.docker/config then)
+- kubedev template -> Trim down replicas to 1, because otherwise tilt's live-update will not work
 - kubedev deploy -> Add --version parameter to specify the helm chart version
 - kubedev (all sub-commands) -> Return non-0 exit code on failure
-- Escape $ signs in variable content??
+- Escape \$ signs in variable content??
 - Add flushs to print statements
 - kubedev check ✔
 - kubedev generate ✔

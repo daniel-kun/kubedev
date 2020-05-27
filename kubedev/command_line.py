@@ -15,7 +15,7 @@ Commands
 import argparse
 import sys
 
-from .kubedev import Kubedev
+from .kubedev import Kubedev, RealEnvAccessor, RealFileAccessor, RealPrinter
 
 
 def add_common_arguments(argParser):
@@ -23,8 +23,7 @@ def add_common_arguments(argParser):
       '-c', '--config', help='Path to config file', required=False, default='kubedev.json')
 
 
-def main():
-  argv = sys.argv
+def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_accessor=RealFileAccessor()):
   generatorArgParser = argparse.ArgumentParser()
   add_common_arguments(generatorArgParser)
 
@@ -46,6 +45,8 @@ def main():
 
   checkArgParser = argparse.ArgumentParser()
   add_common_arguments(checkArgParser)
+  checkArgParser.add_argument('command', metavar='Command', type=str, nargs='*',
+                              help="An optional sub-command to check for. If provided, only the required environment for this sub-command will be checked.")
 
   def print_help(argv):
     print('HELP: TODO')
@@ -53,32 +54,33 @@ def main():
   def generate(argv):
     args = generatorArgParser.parse_args(argv)
     kubedev = Kubedev()  # TODO: Find templates dir
-    kubedev.generate(args.config)
+    return kubedev.generate(args.config)
 
   def template(argv):
     args = templateArgParser.parse_args(argv)
     kubedev = Kubedev()
-    kubedev.template(args.config)
+    return kubedev.template(args.config)
 
   def deploy(argv):
     args = deployArgParser.parse_args(argv)
     kubedev = Kubedev()
-    kubedev.deploy(args.config)
+    return kubedev.deploy(args.config)
 
   def build(argv):
     args = buildArgParser.parse_args(argv)
     kubedev = Kubedev()
-    kubedev.build(args.config, args.container)
+    return kubedev.build(args.config, args.container)
 
   def push(argv):
     args = pushArgParser.parse_args(argv)
     kubedev = Kubedev()
-    kubedev.push(args.config, args.container)
+    return kubedev.push(args.config, args.container)
 
   def check(argv):
     args = checkArgParser.parse_args(argv)
     kubedev = Kubedev()
-    kubedev.check(args.config)
+    return kubedev.check(args.config, args.command,
+                         env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
 
   commands = {
       'generate': generate,
@@ -92,9 +94,15 @@ def main():
 
   if len(argv) < 2:
     print_help([])
+    return 0
   else:
     command = argv[1]
     if command not in commands:
       print_help(argv[2:])
+      return 0
     else:
-      commands[command](argv[2:])
+      return commands[command](argv[2:])
+
+
+def main():
+  return main_impl(sys.argv)
