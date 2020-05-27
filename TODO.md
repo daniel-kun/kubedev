@@ -3,8 +3,12 @@
 - kubedev check -> Print out the env documentation for missing env vars
 - kubedev check -> Add a paramter to check only env vars for a specific deployment
 - kubedev check -> Check for required command line tools
-- kubedev check -> Check for KUBEDEV_ system env card
+- kubedev check -> Check for KUBEDEV\_ system env card
 - kubedev check -> Allow to check only for certain commands)
+- kubedev deploy -> Add --version parameter to specify the helm chart version
+- kubedev (all sub-commands) -> Return non-0 exit code on failure
+- Escape $ signs in variable content??
+- Add flushs to print statements
 - kubedev check ✔
 - kubedev generate ✔
 - kubedev template ✔
