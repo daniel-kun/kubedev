@@ -9,6 +9,7 @@ from os import environ, getenv, path
 
 import pkg_resources
 import yaml
+
 from kubedev.utils import KubedevConfig, YamlMerger
 
 
@@ -110,16 +111,15 @@ class Kubedev:
     file_accessor.save_file(path.join(
         'helm-chart', 'Chart.yaml'), _load_template(chartYamlTemplatePath, variables, template_accessor), overwrite)
 
-    images = dict()  # Collect all images across deployments, cronjobs, etc.
     portForwards = dict()  # Collect all port-forwards for deployments and daemonsets for tilt
 
     print('⚓ Generating helm-chart...')
     if 'deployments' in kubedev:
-      (deploymentImages, deploymentPortForwards) = self.generate_deployments(
+      (_, deploymentPortForwards) = self.generate_deployments(
           kubedev, projectName, envs, variables, imageRegistry, file_accessor, template_accessor, overwrite)
-      images.update(deploymentImages)
       portForwards.update(deploymentPortForwards)
 
+    images = KubedevConfig.get_images(kubedev, env_accessor)
     self.generate_ci(images, kubedev, projectName, envs, variables,
                      imageRegistry, file_accessor, overwrite)
 
@@ -263,7 +263,7 @@ class Kubedev:
     print('💫 Generating Tiltfile...')
     tiltfile = StringIO()
     for imageKey, image in images.items():
-      tiltfile.write(f"docker_build('{image['image']}', '{imageKey}')\n")
+      tiltfile.write(f"docker_build('{image['imageNameTagless']}', '{image['buildPath']}')\n")
     tiltfile.write('\n')
 
     tiltfile.write("k8s_yaml(local('kubedev template'))\n")
@@ -273,15 +273,16 @@ class Kubedev:
       portForwardStr = ",".join(
           [f"'{p['dev']}:{p['service']}'" for p in portForward])
       tiltfile.write(
-          f"k8s_resource('{projectName}-{portKey}', port_forwards=[{portForwardStr}])\n")
+          f"k8s_resource('{KubedevConfig.collapse_names(projectName, portKey)}', port_forwards=[{portForwardStr}])\n")
 
     file_accessor.save_file('Tiltfile', tiltfile.getvalue(), overwrite)
 
   def generate_projects(self, images, file_accessor):
-    for imageKey in images.keys():
+    for imageKey, imageInfos in images.items():
       print(f'🐳 Generating {imageKey}/Dockerfile...')
-      file_accessor.mkdirhier(imageKey)
-      dockerfile = f'{imageKey}/Dockerfile'
+      path = imageInfos["buildPath"]
+      file_accessor.mkdirhier(path)
+      dockerfile = f'{path}Dockerfile'
       file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
 
   def _get_kubecontext_arg(self, env_accessor):

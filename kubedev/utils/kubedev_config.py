@@ -86,6 +86,7 @@ class KubedevConfig:
         finalDeploymentName = KubedevConfig.collapse_names(name, deploymentKey)
         images[deploymentKey] = {
             "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
+            "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
             "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
             "required-envs": {*globalEnvs, *KubedevConfig.load_envs(deployment, True, False)}
         }
