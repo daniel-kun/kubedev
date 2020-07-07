@@ -124,3 +124,10 @@ class KubedevConfig:
     """
     envs = image['required-envs']
     return " ".join([f'--build-arg {env}="${{{env}}}"' for env in sorted(envs)]) + " "
+
+  @staticmethod
+  def get_helm_release_name(kubedev):
+    if 'helmReleaseName' in kubedev:
+      return kubedev['helmReleaseName']
+    else:
+      return kubedev['name']

@@ -315,7 +315,8 @@ class Kubedev:
         self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
 
   def deploy_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
-    return self._template_or_deploy(kubedev, f"upgrade {kubedev['name']} ./helm-chart/ --install --wait", shell_executor, env_accessor, file_accessor)
+    release_name = KubedevConfig.get_helm_release_name(kubedev)
+    return self._template_or_deploy(kubedev, f"upgrade {release_name} ./helm-chart/ --install --wait", shell_executor, env_accessor, file_accessor)
 
   def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.build_from_config(

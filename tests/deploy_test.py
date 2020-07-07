@@ -72,3 +72,31 @@ lkasjfjklsdflkj:
     kubeConfig = files.load_file(kubeconfig_temp_path)
     self.assertIsNotNone(kubeConfig)
     self.assertEqual(kubeConfig, kubeConfigContent)
+
+  def test_deploy_uses_explicit_helm_release_name(self):
+    # ARRANGE
+    shell = ShellExecutorMock()
+    env = EnvMock()
+    env.setenv('KUBEDEV_KUBECONFIG', 'asdf')
+
+    files = FileMock()
+
+    config = testDeploymentConfig.copy()
+    config['helmReleaseName'] = "special-helm-release-name"
+
+    # ACT
+    sut = Kubedev()
+    sut.deploy_from_config(config, shell, env, files)
+
+    # ASSERT
+    shellCalls = shell.calls()
+    self.assertEqual(1, len(shellCalls))
+    self.assertListEqual([
+        '/bin/sh',
+        '-c',
+        'helm upgrade special-helm-release-name ./helm-chart/ --install --wait --kubeconfig ' +
+        f'{kubeconfig_temp_path}   ' +
+        '--set KUBEDEV_TAG="none" ' +
+        '--set FOO_SERVICE_DEPLOY_ENV1="${FOO_SERVICE_DEPLOY_ENV1}" --set FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}" ' +
+        '--set FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"'
+    ], shellCalls[0]['cmd'])
