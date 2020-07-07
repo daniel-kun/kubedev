@@ -207,9 +207,9 @@ class KubeDevCheckTests(unittest.TestCase):
     result = main_impl(['/somewhere/kubedev', 'check', 'build'],
                        env_accessor=envMock, printer=outputMock, file_accessor=fileMock)
     messages = outputMock.messages()
-    if not result:
+    if result != 0:
       self.assertTrue(False, f"Did not expect these messages: {messages}")
-    self.assertTrue(result)
+    self.assertEqual(0, result)
 
   def test_check_cmdline_build_some_missing(self):
     envMock = EnvMock()
@@ -260,6 +260,6 @@ class KubeDevCheckTests(unittest.TestCase):
     result = main_impl(['/somewhere/kubedev', 'check', 'build'],
                        env_accessor=envMock, printer=outputMock, file_accessor=fileMock)
     messages = outputMock.messages()
-    self.assertFalse(result)
+    self.assertNotEqual(0, result)
     self.assertEqual(1, len(messages))
     self.assertIn('FOO_SERVICE_DEPLOY_ENV1', messages[0]['message'])

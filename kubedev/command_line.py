@@ -51,10 +51,16 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
   def print_help(argv):
     print('HELP: TODO')
 
+  def bool_to_returncode(boolValue):
+    if boolValue:
+      return 0
+    else:
+      return 1
+
   def generate(argv):
     args = generatorArgParser.parse_args(argv)
     kubedev = Kubedev()  # TODO: Find templates dir
-    return kubedev.generate(args.config)
+    return bool_to_returncode(kubedev.generate(args.config))
 
   def template(argv):
     args = templateArgParser.parse_args(argv)
@@ -79,8 +85,8 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
   def check(argv):
     args = checkArgParser.parse_args(argv)
     kubedev = Kubedev()
-    return kubedev.check(args.config, args.command,
-                         env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
+    return bool_to_returncode(kubedev.check(args.config, args.command,
+                         env_accessor=env_accessor, printer=printer, file_accessor=file_accessor))
 
   commands = {
       'generate': generate,

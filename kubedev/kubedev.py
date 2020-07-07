@@ -37,7 +37,7 @@ class RealShellExecutor:
   def execute(self, commandWithArgs, envVars):
     print(
         f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})', file=sys.stderr)
-    return subprocess.run(commandWithArgs, env={**environ, **envVars})
+    return subprocess.run(commandWithArgs, env={**environ, **envVars}).returncode
 
 
 class RealEnvAccessor:
@@ -301,7 +301,7 @@ class Kubedev:
         f'--set KUBEDEV_TAG="{tag}"' +
         KubedevConfig.get_helm_set_env_args(kubedev)
     ]
-    shell_executor.execute(command, variables)
+    return shell_executor.execute(command, variables)
 
   def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
     return self.template_from_config(
@@ -336,7 +336,7 @@ class Kubedev:
           KubedevConfig.get_docker_build_args(image) +
           f"{image['buildPath']}"
       ]
-      shell_executor.execute(call, dict())
+      return shell_executor.execute(call, dict())
 
   def push(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.push_from_config(
@@ -354,7 +354,7 @@ class Kubedev:
           '-c',
           f"docker push {image['imageName']}"
       ]
-      shell_executor.execute(call, dict())
+      return shell_executor.execute(call, dict())
 
   def check(self, configFileName, commands, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_accessor=RealFileAccessor()):
     return self.check_from_config(
