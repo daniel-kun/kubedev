@@ -19,43 +19,52 @@ It builds on:
 
 ## Current state of development
 
-`kubedev` is in early development. Currently, the following commands are implemented:
-
-- _None yet_
+`kubedev` is in early development. Some commands are implemented (see below), but the test coverage is not
+high and there might be some quirks and undocumented behaviour.
 
 ## Synopsis
 
 `kubedev` commands are based on the definitions found in `kubedev.json`, which include the minimum necessary information that is required to execute common cloud-dev related tasks.
 
-A kubedev.json describes an "App", which in turn can contain "Sub-Apps" that may be deployments, daemonsets or cronjobs.
+A kubedev.json describes an "Service", which in turn can contain "Apps" that may be deployments, daemonsets or cronjobs.
 
 Schema of kubedev.json:
 
 ```jsonc
 {
     "name": "myservice",
-    "ci-provider": "gitlab",
+    "description": "My fancy service 🎆",
+    "imagePullSecrets": "foo-creds", # Your docker registry auth credentials
+    "imageRegistry": "foo-registry", # Your docker registry
+    "required-envs": {
+      "MYSERVICE_ENV": {
+        "documentation": "Describe MYSERVICE_ENV here, so that other devs on your team know how to set them in their own env",
+        "container": true, # Use this environment variable when running containers
+        "build": true # Use this environment variable for building the container
+      }
+    },
     "deployments": {
-        "mydeploy": { # A Sub-App `mydeploy' of type deployment
-            "used-frameworks": ["python", "pipenv", "npm", "vue"], # used-frameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.
-            "dev-only": true, # default: false. Specifies whether this service must only be deployed on local development machines
-            "port": 5000,
-            "dev-port": 8081, # The port that tilt  up forwards
+        "mydeploy": { # An App `mydeploy' of type deployment
+            "used-frameworks": ["python", "pipenv", "npm", "vue"], # Not implemented, yet. used-frameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.
+            "ports": {
+              "https": {
+                  "container": "8081", # This is the port that your actual dockerized service is bound to
+                  "service": "8082",   # This is the port that the Kubernetes service serves on. Will be redirected to the container-port of the pods.
+                  "dev": "8083" # This is the port used for local development by either `tilt` or `kubedev run`. Will be available on localhost when using `tilt up` or `kubedev run`.
+              }
+            },
             "required-envs": {
                 "MYDEPLOY_FLASK_ENV": {
-                    "documentation": "...",
-                    "encoding": "base64"
+                    "documentation": "..."
                 }
             }
         }
     },
     "daemonsets": {
-       …
+       # … not implemented, yet
     },
     "cronjobs": {
-        "mycronjob": {  # A Sub-App mycronjob of type cronjobs
-            … # Includes necessary definitions for CronJobs
-        }
+       # … not implemented, yet
     }
 }
 ```
@@ -73,13 +82,13 @@ Creates:
 
 ## kubedev generate [--overwrite]
 
-_NOT IMPLEMENTED, YET_
+✔ Implemented
 
-Creates a helm-chart (with Deployment/DaemonSet/CronJob and optionally Services), Tiltfile and .gitlab-ci.yml from the definitions in ./kubedev.json. If ./kubedev.json does not exist, instructions are printed (referencing the "kubedev init" command).
+Creates a helm-chart (with Deployment and optionally Services), Tiltfile, .gitlab-ci.yml and Dockerfiles and probably subdirectories for each App from the definitions in ./kubedev.json. If ./kubedev.json does not exist, instructions are printed (referencing the "kubedev init" command).
 
 ## kubedev generate helm-chart \<template\>
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Creates a helm-chart for this service, according to kubedev.json, consisting of:
 
@@ -89,13 +98,13 @@ Creates a helm-chart for this service, according to kubedev.json, consisting of:
 
 ## kubedev generate Tiltfile \<template\>
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Creates a Tiltfile with some sensible defaults.
 
 ## kubedev generate gitlab-ci
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Creates a .gitlab-ci.yml file containing the `build-push` and `deploy` states:
 
@@ -106,22 +115,22 @@ It uses the latest stable dev-baseimage.
 
 ## kubedev check
 
-_NOT IMPLEMENTED, YET_
-
 Reads kubedev.json and checks whether all environment variables from the configuration is set in the current environment. It prints missing variables, including it's documentation.
+
+❌ __ NOT IMPLEMENTED:__
 
 For used-frameworks "pipenv", it runs `bandit`.
 For used-frameworks "npm", it runs `npm audit`.
 
 ## kubedev print env-doc
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Prints out a Markdown table with all environment variables declared in kubedev.json and their documentation.
 
 ## kubedev up [--clean]
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Checks the current environment and runs `tilt up` when the configuration is OK.
 
@@ -131,54 +140,48 @@ The --clean switch runs `tilt down` before running tilt up.
 
 ## kubedev down
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Runs `tilt down`.
 
 ## kubedev test-ci \<job\>
 
-_NOT IMPLEMENTED, YET_
+❌ _NOT IMPLEMENTED, YET_
 
 Creates a temporary branch, commits all local changes and uncommited files to this branch, then runs `gitlab-runner exec shell <job>` and then restores the previous git state.
 
-## kubedev build \<sub-app\>
+## kubedev build \<app\>
 
-_NOT IMPLEMENTED, YET_
+✔ Implemented
 
-Runs `docker build` with all docker build args as defined in kubedev.json and tags it with a temporary, unique development tag.
+Runs `docker build` for \<app\> with all docker build args as defined in kubedev.json. When CI_COMMIT_SHORT_SHA and CI_COMMIT_REF_NAME are set (inside a GitLab CI build job), the tag will be formatted as "${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}", otherwise the tag will be "none".
 
-The docker image name is deducted from the git repository name, thus this command must be run in a git working copy.
+Is used inside the CI/CD build jobs generated by `kubedev generate` and internally by the `kubedev run` command.
 
-Is used inside the CI/CD build jobs.
+## kubedev push \<app\>
 
-## kubedev push \<sub-app\>
+✔ Implemented
 
-_NOT IMPLEMENTED, YET_
+Runs `docker push` for \<app\>. When CI_COMMIT_SHORT_SHA and CI_COMMIT_REF_NAME are set (inside a GitLab CI build job), the tag will be formatted as "${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}", otherwise the tag will be "none".
 
-When `kubedev build` has been run before, it runs `docker push` with the last successful build's unique development tag.
+Is used inside the CI/CD build jobs generated by `kubedev generate`.
 
-The docker image name is deducted from the git repository name, thus this command must be run in a git working copy.
+## kubedev run \<app\>
 
-Is used inside the CI/CD build jobs.
+✔ Implemented
 
-## kubedev run [args…]
-
-_NOT IMPLEMENTED, YET_
-
-Runs `kubedev build` and runs the new docker image with all envs set and ports forwarded, optionally with [args…].
+Runs `kubedev build` and then runs the new docker image with all envs set and ports forwarded.
 
 ## kubedev deploy
 
-_NOT IMPLEMENTED, YET_
+✔ Implemented
 
-Reads the `.kube/conf` from an environment variable, auto-increases the `helm-chart/Chart.yaml`'s version and then runs `helm install` with appropriate arguments and env vars from `kubedev.json`.
+Reads a kube config from the env var $KUBEDEV_KUBECONFIG (required) and optionally a context from $KUBEDEV_KUBECONTEXT and then runs `helm upgrade --install` with appropriate arguments and env vars from `kubedev.json`.
 
-Is used inside the CI/CD build jobs.
+Is used inside the CI/CD build jobs generated by `kubedev generate`.
 
 ## kubedev template
 
-_NOT IMPLEMENTED, YET_
-
 Basically runs `helm template` with appropriate arguments and env vars from `kubedev.json`.
 
-Is used inside the Tiltfile.
+Is used inside the Tiltfile generated by `kubedev generate`.
