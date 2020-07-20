@@ -7,6 +7,7 @@ class ShellExecutorMock:
 
   def execute(self, commandWithArgs, envVars):
     self._calls.append({'cmd': commandWithArgs, 'env': envVars})
+    return 0
 
   def calls(self):
     return self._calls
@@ -62,3 +63,15 @@ class OutputMock:
 
   def messages(self):
     return self._prints
+
+class TagGeneratorMock:
+  def __init__(self, tags):
+    self._tags = tags
+    self._current = 0
+
+  def tag(self):
+    result = self._tags[self._current]
+    self._current = self._current + 1
+    if self._current >= len(self._tags):
+      self._current = 0
+    return result

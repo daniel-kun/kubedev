@@ -6,6 +6,7 @@ import subprocess
 import sys
 from io import StringIO
 from os import environ, getenv, path
+from uuid import uuid4
 
 import pkg_resources
 import yaml
@@ -57,6 +58,9 @@ class RealPrinter:
     else:
       print(message, file=sys.stdout)
 
+class TagGenerator:
+  def tag(self):
+    return str(uuid4()).replace('-', '')
 
 def _load_template(file, variables, template_accessor):
   content = template_accessor.load_template(file)
@@ -262,7 +266,7 @@ class Kubedev:
   def generate_tiltfile(self, projectName, images, portForwards, file_accessor, overwrite):
     print('💫 Generating Tiltfile...')
     tiltfile = StringIO()
-    for imageKey, image in images.items():
+    for _, image in images.items():
       tiltfile.write(f"docker_build('{image['imageNameTagless']}', '{image['buildPath']}')\n")
     tiltfile.write('\n')
 
@@ -278,11 +282,11 @@ class Kubedev:
     file_accessor.save_file('Tiltfile', tiltfile.getvalue(), overwrite)
 
   def generate_projects(self, images, file_accessor):
-    for imageKey, imageInfos in images.items():
-      print(f'🐳 Generating {imageKey}/Dockerfile...')
+    for _, imageInfos in images.items():
       path = imageInfos["buildPath"]
-      file_accessor.mkdirhier(path)
       dockerfile = f'{path}Dockerfile'
+      print(f'🐳 Generating {dockerfile}...')
+      file_accessor.mkdirhier(path)
       file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
 
   def _get_kubecontext_arg(self, env_accessor):
@@ -320,19 +324,23 @@ class Kubedev:
 
   def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.build_from_config(
-        self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
+        self._load_config(configFileName), container=container, force_tag=None, shell_executor=shell_executor, env_accessor=env_accessor)
 
-  def build_from_config(self, kubedev, container, shell_executor, env_accessor):
+  def build_from_config(self, kubedev, container, force_tag, shell_executor, env_accessor):
     images = KubedevConfig.get_images(kubedev, env_accessor)
     if not container in images:
       raise KeyError(
           f"Container {container} is not defined in kubedev config.")
     else:
       image = images[container]
+      if force_tag is None:
+        imageTag = image['imageName']
+      else:
+        imageTag = f"{image['imageNameTagless']}:{force_tag}"
       call = [
           '/bin/sh',
           '-c',
-          f"docker build -t {image['imageName']} " +
+          f"docker build -t {imageTag} " +
           KubedevConfig.get_docker_build_args(image) +
           f"{image['buildPath']}"
       ]
@@ -396,3 +404,38 @@ class Kubedev:
     else:
       print('❌ Check failed')
     return result
+
+  def run(self, configFileName, container, env_accessor=RealEnvAccessor(), shell_executor=RealShellExecutor(), printer=RealPrinter(), file_accessor=RealFileAccessor()):
+    return self.run_from_config(
+        self._load_config(configFileName, file_accessor), container, env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
+
+  def run_from_config(self,
+                      kubedev,
+                      container,
+                      env_accessor=RealEnvAccessor(),
+                      shell_executor=RealShellExecutor(),
+                      printer=RealPrinter(),
+                      file_accessor=RealFileAccessor(),
+                      tag_generator=TagGenerator()):
+    images = KubedevConfig.get_images(kubedev, env_accessor)
+    if not container in images:
+      raise KeyError(
+          f"Container {container} is not defined in kubedev config.")
+    else:
+      image = images[container]
+      currentTag = tag_generator.tag()
+      buildResult = self.build_from_config(
+          kubedev, container, currentTag, shell_executor=shell_executor, env_accessor=env_accessor)
+      if buildResult != 0:
+        return buildResult
+      else:
+        command = [
+          '/bin/sh',
+          '-c',
+          "docker run --interactive --tty --rm " +
+          KubedevConfig.get_docker_run_ports(image) +
+          KubedevConfig.get_docker_run_envs(image) +
+          f"{image['imageNameTagless']}:{currentTag}"
+        ]
+        runResult = shell_executor.execute(command, dict())
+        return runResult

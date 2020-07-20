@@ -5,4 +5,5 @@ from .generate_ci_test import KubeDevGenerateCITests
 from .generate_deployment_test import KubeDevGenerateDeploymentTests
 from .generate_dockerfiles_test import KubeDevGenerateDockerfiles
 from .push_test import KubeDevPushTests
+from .run_test import KubeDevRunTests
 from .template_test import KubeDevTemplateTests

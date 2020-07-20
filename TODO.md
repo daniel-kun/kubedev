@@ -1,9 +1,9 @@
-- kubedev check -> Allow to check only for certain commands
 - kubedev check -> Check for KUBEDEV\_ system env card
+- kubedev build/push/deploy/template -> Call check for the current sub-command before trying to execute anything
 - kubedev check -> Print out the env documentation for missing env vars
 - kubedev check -> Add a paramter to check only env vars for a specific deployment
 - kubedev check -> Check for required command line tools
-- kubedev build/publish -> Add docker credentials/config (use env var "CI" to detect CI environment, and write a ~/.docker/config then)
+- kubedev push -> Add docker credentials/config (use env var "CI" to detect CI environment, and write a ~/.docker/config then)
 - kubedev template -> Trim down replicas to 1, because otherwise tilt's live-update will not work
 - kubedev deploy -> Add --version parameter to specify the helm chart version
 - kubedev (all sub-commands) -> Return non-0 exit code on failure

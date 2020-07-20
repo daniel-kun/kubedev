@@ -13,7 +13,7 @@ class KubeDevBuildTests(unittest.TestCase):
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
-    sut.build_from_config(testMultiDeploymentsConfig, 'foo-deploy',
+    sut.build_from_config(testMultiDeploymentsConfig, 'foo-deploy', force_tag=None,
                           shell_executor=shellMock, env_accessor=envMock)
 
     calls = shellMock.calls()
@@ -37,7 +37,7 @@ class KubeDevBuildTests(unittest.TestCase):
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
-    sut.build_from_config(testMultiDeploymentsConfig, 'bar-deploy',
+    sut.build_from_config(testMultiDeploymentsConfig, 'bar-deploy', force_tag=None,
                           shell_executor=shellMock, env_accessor=envMock)
 
     calls = shellMock.calls()
@@ -61,7 +61,7 @@ class KubeDevBuildTests(unittest.TestCase):
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
-    self.assertRaises(KeyError, lambda: sut.build_from_config(testMultiDeploymentsConfig, 'i-do-not-exist',
+    self.assertRaises(KeyError, lambda: sut.build_from_config(testMultiDeploymentsConfig, 'i-do-not-exist', force_tag=None,
                                                               shell_executor=shellMock, env_accessor=envMock))
 
   def test_build_single_collapsedname_deployment_foo(self):
@@ -75,7 +75,7 @@ class KubeDevBuildTests(unittest.TestCase):
     config['name'] = 'foo-deploy'
 
     sut = Kubedev()
-    sut.build_from_config(config, 'foo-deploy',
+    sut.build_from_config(config, 'foo-deploy', force_tag=None,
                           shell_executor=shellMock, env_accessor=envMock)
 
     calls = shellMock.calls()

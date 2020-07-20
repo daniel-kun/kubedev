@@ -47,7 +47,7 @@ class KubeDevPushTests(unittest.TestCase):
     shellMock = ShellExecutorMock()
 
     sut = Kubedev()
-    self.assertRaises(KeyError, lambda: sut.build_from_config(testMultiDeploymentsConfig, 'i-do-not-exist',
+    self.assertRaises(KeyError, lambda: sut.build_from_config(testMultiDeploymentsConfig, 'i-do-not-exist', force_tag=None,
                                                               shell_executor=shellMock, env_accessor=envMock))
 
   def test_push_single_collapsedname_deployment_foo(self):

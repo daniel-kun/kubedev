@@ -9,7 +9,7 @@ Commands
                 - A Tiltfile
                 - A CI-configuration (.gitlab-ci.yml)
                 - Directories and Dockerfiles for each defined container
-  help          Display this help message            
+  help          Display this help message
 '''
 
 import argparse
@@ -47,6 +47,11 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
   add_common_arguments(checkArgParser)
   checkArgParser.add_argument('command', metavar='Command', type=str, nargs='*',
                               help="An optional sub-command to check for. If provided, only the required environment for this sub-command will be checked.")
+
+  runArgParser = argparse.ArgumentParser()
+  add_common_arguments(runArgParser)
+  runArgParser.add_argument('container', metavar='Container', type=str,
+                             help="The name of the deployment to run locally.")
 
   def print_help(argv):
     print('HELP: TODO')
@@ -88,6 +93,12 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
     return bool_to_returncode(kubedev.check(args.config, args.command,
                          env_accessor=env_accessor, printer=printer, file_accessor=file_accessor))
 
+  def run(argv):
+    args = runArgParser.parse_args(argv)
+    kubedev = Kubedev()
+    return kubedev.run(args.config, args.container,
+                         env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
+
   commands = {
       'generate': generate,
       'template': template,
@@ -95,6 +106,7 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
       'push': push,
       'deploy': deploy,
       'check': check,
+      'run': run,
       'help': print_help
   }
 

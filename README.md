@@ -161,7 +161,7 @@ The docker image name is deducted from the git repository name, thus this comman
 
 Is used inside the CI/CD build jobs.
 
-## kubedev run-local [args…]
+## kubedev run [args…]
 
 _NOT IMPLEMENTED, YET_
 

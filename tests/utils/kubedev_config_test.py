@@ -44,11 +44,21 @@ class KubedevConfigTests(unittest.TestCase):
         testMultiDeploymentsConfig, env_accessor=EnvMock())
     self.assertIn("foo-deploy", images)
     fooDeploy = images["foo-deploy"]
-    self.assertIn("required-envs", fooDeploy)
-    fooRequiredEnvs = fooDeploy["required-envs"]
-    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", fooRequiredEnvs)
-    self.assertIn("FOO_SERVICE_DEPLOY_ENV1", fooRequiredEnvs)
-    self.assertEqual(2, len(fooRequiredEnvs))
+    self.assertIn("buildEnvs", fooDeploy)
+
+    fooBuildEnvs = fooDeploy["buildEnvs"]
+    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", fooBuildEnvs)
+    self.assertIn("FOO_SERVICE_DEPLOY_ENV1", fooBuildEnvs)
+    self.assertEqual(2, len(fooBuildEnvs))
+
+    self.assertIn("containerEnvs", fooDeploy)
+    fooContainerEnvs = fooDeploy["containerEnvs"]
+    self.assertIn("FOO_SERVICE_GLOBAL_ENV1", fooContainerEnvs)
+    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", fooContainerEnvs)
+    self.assertIn("FOO_SERVICE_DEPLOY_ENV1", fooContainerEnvs)
+    self.assertIn("FOO_SERVICE_DEPLOY_ENV2", fooContainerEnvs)
+    self.assertEqual(4, len(fooContainerEnvs))
+
     self.assertIn("imageName", fooDeploy)
     self.assertEqual(
         "foo-registry/foo-service-foo-deploy:none", fooDeploy["imageName"])
@@ -57,11 +67,13 @@ class KubedevConfigTests(unittest.TestCase):
 
     self.assertIn("bar-deploy", images)
     barDeploy = images["bar-deploy"]
-    self.assertIn("required-envs", barDeploy)
-    barRequiredEnvs = barDeploy["required-envs"]
-    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", barRequiredEnvs)
-    self.assertIn("BAR_SERVICE_DEPLOY_ENV2", barRequiredEnvs)
-    self.assertEqual(2, len(barRequiredEnvs))
+    self.assertIn("buildEnvs", barDeploy)
+
+    barBuildEnvs = barDeploy["buildEnvs"]
+    self.assertIn("FOO_SERVICE_GLOBAL_ENV2", barBuildEnvs)
+    self.assertIn("BAR_SERVICE_DEPLOY_ENV2", barBuildEnvs)
+    self.assertEqual(2, len(barBuildEnvs))
+
     self.assertIn("imageName", barDeploy)
     self.assertEqual(
         "foo-registry/foo-service-bar-deploy:none", barDeploy["imageName"])

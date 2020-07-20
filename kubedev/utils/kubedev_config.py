@@ -77,7 +77,8 @@ class KubedevConfig:
   @staticmethod
   def get_images(kubedev, env_accessor):
     images = dict()
-    globalEnvs = KubedevConfig.load_envs(kubedev, True, False)
+    globalBuildEnvs = KubedevConfig.load_envs(kubedev, True, False)
+    globalContainerEnvs = KubedevConfig.load_envs(kubedev, False, True)
     tag = KubedevConfig.get_tag(env_accessor)
     imageRegistry = kubedev["imageRegistry"]
     name = kubedev["name"]
@@ -88,7 +89,9 @@ class KubedevConfig:
             "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
             "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
             "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
-            "required-envs": {*globalEnvs, *KubedevConfig.load_envs(deployment, True, False)}
+            "ports": deployment['ports'] if 'ports' in deployment else dict(),
+            "buildEnvs": {*globalBuildEnvs, *KubedevConfig.load_envs(deployment, True, False)},
+            "containerEnvs": {*globalContainerEnvs, *KubedevConfig.load_envs(deployment, False, True)}
         }
     return images
 
@@ -122,8 +125,29 @@ class KubedevConfig:
 
     :param image: One entry returned from KubedevConfig.get_images()
     """
-    envs = image['required-envs']
+    envs = image['buildEnvs']
     return " ".join([f'--build-arg {env}="${{{env}}}"' for env in sorted(envs)]) + " "
+
+  @staticmethod
+  def get_docker_run_envs(image):
+    """
+    Returns a string with all "--env ..." parameters to the "docker run ..." call.
+
+    :param image: One entry returned from KubedevConfig.get_images()
+    """
+    envs = image['containerEnvs']
+    return " ".join([f'--env {env}="${{{env}}}"' for env in sorted(envs)]) + " "
+
+  @staticmethod
+  def get_docker_run_ports(image):
+    """
+    Returns a string with all "--publish ..." parameters to the "docker run ..." call.
+
+    :param image: One entry returned from KubedevConfig.get_images()
+    """
+    return " ".join([
+      f"--publish {port['dev']}:{port['container']}" for port in image['ports'].values() if "container" in port and "dev" in port
+    ]) + " "
 
   @staticmethod
   def get_helm_release_name(kubedev):
