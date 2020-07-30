@@ -40,6 +40,9 @@ class RealShellExecutor:
         f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})', file=sys.stderr)
     return subprocess.run(commandWithArgs, env={**environ, **envVars}).returncode
 
+  def is_tty(self):
+    return sys.stdout.isatty()
+
 
 class RealEnvAccessor:
   def getenv(self, name, default=None):
@@ -426,13 +429,15 @@ class Kubedev:
       currentTag = tag_generator.tag()
       buildResult = self.build_from_config(
           kubedev, container, currentTag, shell_executor=shell_executor, env_accessor=env_accessor)
+      interactive_flags = "--interactive --tty " if shell_executor.is_tty() else ""
+
       if buildResult != 0:
         return buildResult
       else:
         command = [
           '/bin/sh',
           '-c',
-          "docker run --interactive --tty --rm " +
+          f"docker run {interactive_flags}--rm " +
           KubedevConfig.get_docker_run_ports(image) +
           KubedevConfig.get_docker_run_envs(image) +
           f"{image['imageNameTagless']}:{currentTag}"
