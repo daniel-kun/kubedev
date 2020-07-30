@@ -96,6 +96,7 @@ class KubeDevRunTests(unittest.TestCase):
         '-c',
         'docker ' +
         'run ' +
+        '--interactive ' +
         '--rm ' +
         '--publish ' +
         '8083:8081 ' +
@@ -157,6 +158,7 @@ class KubeDevRunTests(unittest.TestCase):
         '-c',
         'docker ' +
         'run ' +
+        '--interactive ' +
         '--rm ' +
         '--volume C:\\\\Projects\\\\kubedev\\\\output_docker:/test/output ' +
         '--publish ' +

@@ -436,7 +436,7 @@ class Kubedev:
       currentTag = tag_generator.tag()
       buildResult = self.build_from_config(
           kubedev, container, currentTag, shell_executor=shell_executor, env_accessor=env_accessor)
-      interactive_flags = "--interactive --tty " if shell_executor.is_tty() else ""
+      interactive_flags = "--tty " if shell_executor.is_tty() else ""
 
       if buildResult != 0:
         return buildResult
@@ -444,7 +444,7 @@ class Kubedev:
         command = [
           '/bin/sh',
           '-c',
-          f"docker run {interactive_flags}--rm " +
+          f"docker run --interactive {interactive_flags}--rm " +
           KubedevConfig.get_docker_run_volumes(image, file_accessor, shell_executor) +
           KubedevConfig.get_docker_run_ports(image) +
           KubedevConfig.get_docker_run_envs(image) +
