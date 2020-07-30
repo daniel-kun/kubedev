@@ -28,6 +28,11 @@ testDeploymentConfig = {
                     "dev": "8643"
                 },
             },
+            "volumes": {
+              "dev": {
+                "output_docker": "/test/output"
+              }
+            },
             "required-envs": {
                 "FOO_SERVICE_DEPLOY_ENV1": {
                     "documentation": "Test env var #1"

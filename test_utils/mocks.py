@@ -2,13 +2,17 @@ import os
 
 
 class ShellExecutorMock:
-  def __init__(self, is_tty=False):
+  def __init__(self, is_tty=False, cmd_output=None):
     self._calls = []
     self._is_tty = is_tty
+    self._cmd_output = cmd_output
 
   def execute(self, commandWithArgs, envVars):
     self._calls.append({'cmd': commandWithArgs, 'env': envVars})
     return 0
+
+  def get_output(self, commandWithArgs):
+    return self._cmd_output
 
   def is_tty(self):
     return self._is_tty

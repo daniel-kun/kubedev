@@ -53,6 +53,11 @@ Schema of kubedev.json:
                   "dev": "8083" # This is the port used for local development by either `tilt` or `kubedev run`. Will be available on localhost when using `tilt up` or `kubedev run`.
               }
             },
+            "mounts": {
+              "dev": {
+                "host_path": "/container/path" # Mount local directories to container directories when running via `kubedev run`
+              }
+            },
             "required-envs": {
                 "MYDEPLOY_FLASK_ENV": {
                     "documentation": "..."

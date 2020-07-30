@@ -40,6 +40,13 @@ class RealShellExecutor:
         f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})', file=sys.stderr)
     return subprocess.run(commandWithArgs, env={**environ, **envVars}).returncode
 
+  def get_output(self, commandWithArgs):
+    cmdResult = subprocess.run(commandWithArgs, stdout=subprocess.PIPE, encoding='utf-8')
+    if cmdResult.returncode == 0:
+      return cmdResult.stdout
+    else:
+      return None
+
   def is_tty(self):
     return sys.stdout.isatty()
 
@@ -438,6 +445,7 @@ class Kubedev:
           '/bin/sh',
           '-c',
           f"docker run {interactive_flags}--rm " +
+          KubedevConfig.get_docker_run_volumes(image, file_accessor, shell_executor) +
           KubedevConfig.get_docker_run_ports(image) +
           KubedevConfig.get_docker_run_envs(image) +
           f"{image['imageNameTagless']}:{currentTag}"

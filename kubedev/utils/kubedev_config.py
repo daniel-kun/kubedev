@@ -91,7 +91,8 @@ class KubedevConfig:
             "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
             "ports": deployment['ports'] if 'ports' in deployment else dict(),
             "buildEnvs": {*globalBuildEnvs, *KubedevConfig.load_envs(deployment, True, False)},
-            "containerEnvs": {*globalContainerEnvs, *KubedevConfig.load_envs(deployment, False, True)}
+            "containerEnvs": {*globalContainerEnvs, *KubedevConfig.load_envs(deployment, False, True)},
+            "volumes": deployment["volumes"]["dev"] if "volumes" in deployment and "dev" in deployment["volumes"] else dict()
         }
     return images
 
@@ -137,6 +138,25 @@ class KubedevConfig:
     """
     envs = image['containerEnvs']
     return " ".join([f'--env {env}="${{{env}}}"' for env in sorted(envs)]) + " "
+
+  @staticmethod
+  def get_docker_run_volumes(image, file_accessor, shell_executor):
+    """
+    Returns a string with all "--volume ..." parameters to the "docker run ..." call.
+
+    :param image: One entry returned from KubedevConfig.get_images()
+    """
+    def wsl_normalize(path):
+      procVersion = file_accessor.load_file('/proc/version')
+      if "Microsoft" in procVersion:
+        return shell_executor.get_output(['wslpath', '-w', path]).rstrip('\n').replace('\\', '\\\\')
+      else:
+        return os.path.abspath(path)
+
+    volumes = image["volumes"]
+    return " ".join([
+      f"--volume {wsl_normalize(hostPath)}:{containerPath}" for hostPath, containerPath in volumes.items()
+    ]) + (" " if len(volumes) > 0 else "")
 
   @staticmethod
   def get_docker_run_ports(image):
