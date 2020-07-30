@@ -146,7 +146,8 @@ class KubedevConfig:
 
     :param image: One entry returned from KubedevConfig.get_images()
     """
-    def wsl_normalize(path):
+    def create_and_normalize(path):
+      file_accessor.mkdirhier(path)
       procVersion = file_accessor.load_file('/proc/version')
       if "Microsoft" in procVersion:
         return shell_executor.get_output(['wslpath', '-w', path]).rstrip('\n').replace('\\', '\\\\')
@@ -155,7 +156,7 @@ class KubedevConfig:
 
     volumes = image["volumes"]
     return " ".join([
-      f"--volume {wsl_normalize(hostPath)}:{containerPath}" for hostPath, containerPath in volumes.items()
+      f"--volume {create_and_normalize(hostPath)}:{containerPath}" for hostPath, containerPath in volumes.items()
     ]) + (" " if len(volumes) > 0 else "")
 
   @staticmethod

@@ -41,7 +41,7 @@ class RealShellExecutor:
     return subprocess.run(commandWithArgs, env={**environ, **envVars}).returncode
 
   def get_output(self, commandWithArgs):
-    cmdResult = subprocess.run(commandWithArgs, stdout=subprocess.PIPE, encoding='utf-8')
+    cmdResult = subprocess.run(commandWithArgs, check=True, stdout=subprocess.PIPE, encoding='utf-8')
     if cmdResult.returncode == 0:
       return cmdResult.stdout
     else:
