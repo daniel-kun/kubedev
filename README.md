@@ -36,6 +36,7 @@ Schema of kubedev.json:
     "description": "My fancy service 🎆",
     "imagePullSecrets": "foo-creds", # Your docker registry auth credentials
     "imageRegistry": "foo-registry", # Your docker registry
+    "polaris-config": "/path/to/polaris-config.yaml", # specify a custom configuration file for polaris audits
     "required-envs": {
       "MYSERVICE_ENV": {
         "documentation": "Describe MYSERVICE_ENV here, so that other devs on your team know how to set them in their own env",

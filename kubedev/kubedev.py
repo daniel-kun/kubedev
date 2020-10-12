@@ -35,10 +35,23 @@ class RealFileAccessor:
 
 
 class RealShellExecutor:
-  def execute(self, commandWithArgs, envVars):
+  def execute(self, commandWithArgs, envVars: dict = dict(), piped_input: str = None):
+    """
+    Execute a shell command.
+    
+    :param commandWithArgs: the command to execute
+    :param envVars: environment variables to set up for the command to execute
+    :param piped_input: input to be piped into the command to execute
+    """
     print(
-        f'➡️   Executing "{" ".join(commandWithArgs)}" (additional env vars: {" ".join(envVars.keys())})', file=sys.stderr)
-    return subprocess.run(commandWithArgs, env={**environ, **envVars}).returncode
+      f'➡️   Executing "{" ".join(commandWithArgs)}" '
+      f'(additional env vars: {" ".join(envVars.keys())})', 
+      file=sys.stderr)
+    return subprocess.run(commandWithArgs, 
+                          env      = {**environ, **envVars},
+                          input    = piped_input if piped_input else None, 
+                          encoding = "UTF-8"     if piped_input else None, 
+                          ).returncode
 
   def get_output(self, commandWithArgs):
     cmdResult = subprocess.run(commandWithArgs, check=True, stdout=subprocess.PIPE, encoding='utf-8')
@@ -303,7 +316,7 @@ class Kubedev:
     e = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
     return f'--kube-context {e}' if e != None and isinstance(e, str) and e != '' else ' '
 
-  def _template_or_deploy(self, kubedev, command, shell_executor, env_accessor, file_accessor):
+  def _template_or_deploy(self, kubedev, command, shell_executor, env_accessor, file_accessor, get_output=False):
     variables = KubedevConfig.get_global_variables(kubedev)
     tag = KubedevConfig.get_tag(env_accessor)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
@@ -315,14 +328,27 @@ class Kubedev:
         f'--set KUBEDEV_TAG="{tag}"' +
         KubedevConfig.get_helm_set_env_args(kubedev)
     ]
-    return shell_executor.execute(command, variables)
+    if not get_output:
+      return shell_executor.execute(command, variables)
+    else:
+      return shell_executor.get_output(command)
 
   def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
     return self.template_from_config(
         self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
 
-  def template_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
-    return self._template_or_deploy(kubedev, "template ./helm-chart/", shell_executor, env_accessor, file_accessor)
+  def template_from_config(self, 
+                           kubedev, 
+                           shell_executor, 
+                           env_accessor=RealEnvAccessor(), 
+                           file_accessor=RealFileAccessor(),
+                           get_output=False):
+    return self._template_or_deploy(kubedev, 
+                                    "template ./helm-chart/", 
+                                    shell_executor, 
+                                    env_accessor, 
+                                    file_accessor,
+                                    get_output)
 
   def deploy(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
     return self.deploy_from_config(
@@ -374,9 +400,48 @@ class Kubedev:
       ]
       return shell_executor.execute(call, dict())
 
+  def audit(self, configFileName):
+    """
+    Check a helm-chart for compliance.
+
+    :param configFileName: kubedev configuration filename
+    """
+    return self.audit_from_config(self._load_config(configFileName))
+
+  def audit_from_config(self, 
+                        kubedev, 
+                        shell=RealShellExecutor(), 
+                        env_accessor=RealEnvAccessor()):
+    try:
+      polaris_config_exists = False if not kubedev["polaris-config"] else True
+    except KeyError:
+      polaris_config_exists = False
+    k8s_spec        = self.template_from_config(
+                        kubedev=kubedev,
+                        shell_executor=shell,
+                        env_accessor=env_accessor,
+                        get_output=True)
+    polaris_audit   = [ "polaris",
+                        "audit",
+                        "--audit-path",
+                        "-",
+                        "--config"                if polaris_config_exists else "",
+                        kubedev["polaris-config"] if polaris_config_exists else "",
+                        "--set-exit-code-on-danger",
+                        "--format",
+                        "yaml"]
+    audit_exit_code = shell.execute(
+                          commandWithArgs = polaris_audit,
+                          piped_input     = k8s_spec)
+    return audit_exit_code
+
   def check(self, configFileName, commands, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_accessor=RealFileAccessor()):
     return self.check_from_config(
-        self._load_config(configFileName, file_accessor), commands, env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
+      kubedev       = self._load_config(configFileName, file_accessor), 
+      commands      = commands, 
+      env_accessor  = env_accessor, 
+      printer       = printer, 
+      file_accessor = file_accessor)
 
   def check_from_config(self, kubedev, commands, env_accessor, printer, file_accessor):
     def is_command(cmd):
@@ -384,6 +449,7 @@ class Kubedev:
 
     result = True
 
+    # check if all environment variables are set
     if is_command('generate'):
       if not 'name' in kubedev:
         printer.print(
