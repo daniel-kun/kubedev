@@ -7,3 +7,4 @@ from .generate_dockerfiles_test import KubeDevGenerateDockerfiles
 from .push_test import KubeDevPushTests
 from .run_test import KubeDevRunTests
 from .template_test import KubeDevTemplateTests
+from .audit_test import KubeDevAuditTests

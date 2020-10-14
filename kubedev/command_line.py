@@ -43,6 +43,9 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
   pushArgParser.add_argument('container', metavar='Container', type=str,
                              help="The name of the deployment to push the container image for.")
 
+  auditArgParser = argparse.ArgumentParser()
+  add_common_arguments(auditArgParser)
+
   checkArgParser = argparse.ArgumentParser()
   add_common_arguments(checkArgParser)
   checkArgParser.add_argument('command', metavar='Command', type=str, nargs='*',
@@ -87,6 +90,11 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
     kubedev = Kubedev()
     return kubedev.push(args.config, args.container)
 
+  def audit(argv):
+    args = auditArgParser.parse_args(argv)
+    kubedev = Kubedev()
+    return kubedev.audit(args.config)
+
   def check(argv):
     args = checkArgParser.parse_args(argv)
     kubedev = Kubedev()
@@ -106,6 +114,7 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
       'push': push,
       'deploy': deploy,
       'check': check,
+      'audit': audit,
       'run': run,
       'help': print_help
   }
