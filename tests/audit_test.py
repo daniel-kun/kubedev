@@ -1,4 +1,5 @@
 import unittest
+
 import test_utils
 from kubedev import Kubedev
 
@@ -10,8 +11,6 @@ class KubeDevAuditTests(unittest.TestCase):
         shell = test_utils.ShellExecutorMock()
         env = test_utils.EnvMock()
         env.setenv('HOME', '/home/kubedev')
-        env.setenv('KUBEDEV_KUBECONFIG', 'default')
-        env.setenv('KUBEDEV_KUBECONTEXT', 'kubedev-ctx')
 
         # ACT
         kubedev = Kubedev()
@@ -20,7 +19,6 @@ class KubeDevAuditTests(unittest.TestCase):
         for cmd in shell.calls()[0]["cmd"]:
             if cmd:
                 actual_command.append(cmd) 
-        print(f"executing command: {actual_command}")
         expected_command = [
             "polaris",
             "audit",

@@ -316,14 +316,29 @@ class Kubedev:
     e = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
     return f'--kube-context {e}' if e != None and isinstance(e, str) and e != '' else ' '
 
-  def _template_or_deploy(self, kubedev, command, shell_executor, env_accessor, file_accessor, get_output=False):
+  def _template(self, kubedev, shell_executor, env_accessor, file_accessor, get_output=False):
+    variables = KubedevConfig.get_global_variables(kubedev)
+    tag = KubedevConfig.get_tag(env_accessor)
+    command = [
+        '/bin/sh',
+        '-c',
+        f'helm template ./helm-chart/ ' +
+        f'--set KUBEDEV_TAG="{tag}"' +
+        KubedevConfig.get_helm_set_env_args(kubedev)
+    ]
+    if not get_output:
+      return shell_executor.execute(command, variables)
+    else:
+      return shell_executor.get_output(command)
+
+  def _deploy(self, kubedev, release_name, shell_executor, env_accessor, file_accessor, get_output=False):
     variables = KubedevConfig.get_global_variables(kubedev)
     tag = KubedevConfig.get_tag(env_accessor)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
     command = [
         '/bin/sh',
         '-c',
-        f'helm {command} ' +
+        f'helm upgrade {release_name} ./helm-chart/ --install --wait ' +
         f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
         f'--set KUBEDEV_TAG="{tag}"' +
         KubedevConfig.get_helm_set_env_args(kubedev)
@@ -343,8 +358,7 @@ class Kubedev:
                            env_accessor=RealEnvAccessor(), 
                            file_accessor=RealFileAccessor(),
                            get_output=False):
-    return self._template_or_deploy(kubedev, 
-                                    "template ./helm-chart/", 
+    return self._template(kubedev, 
                                     shell_executor, 
                                     env_accessor, 
                                     file_accessor,
@@ -356,7 +370,7 @@ class Kubedev:
 
   def deploy_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
     release_name = KubedevConfig.get_helm_release_name(kubedev)
-    return self._template_or_deploy(kubedev, f"upgrade {release_name} ./helm-chart/ --install --wait", shell_executor, env_accessor, file_accessor)
+    return self._deploy(kubedev, release_name, shell_executor, env_accessor, file_accessor)
 
   def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.build_from_config(
