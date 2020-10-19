@@ -130,6 +130,12 @@ Reads kubedev.json and checks whether all environment variables from the configu
 For used-frameworks "pipenv", it runs `bandit`.
 For used-frameworks "npm", it runs `npm audit`.
 
+## kubedev audit
+
+Audits the k8s specification using [Fairwind's Polaris](https://github.com/FairwindsOps/polaris).
+
+A custom configuration file can be specified via the global property `polaris-config`.
+
 ## kubedev print env-doc
 
 ❌ _NOT IMPLEMENTED, YET_
