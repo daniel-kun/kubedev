@@ -7,6 +7,8 @@ It builds on:
 - [docker](https://docker.com/)
 - [tilt](https://tilt.dev/)
 - [helm](https://helm.sh/)
+- Security audits:
+  - [Fairwinds Polaris](https://github.com/FairwindsOps/polaris)
 - CI providers:
   - [GitLab](https://gitlab.com/)
 
