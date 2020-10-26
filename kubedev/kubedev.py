@@ -20,7 +20,7 @@ class RealFileAccessor:
       with open(filename, 'r') as f:
         return f.read()
     except FileNotFoundError:
-      return ''
+      return None
 
   def save_file(self, filename, content, overwrite):
     if not overwrite and path.exists(filename):
@@ -391,11 +391,30 @@ class Kubedev:
     release_name = KubedevConfig.get_helm_release_name(kubedev)
     return self._deploy(kubedev, release_name, shell_executor, env_accessor, file_accessor)
 
-  def build(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
-    return self.build_from_config(
-        self._load_config(configFileName), container=container, force_tag=None, shell_executor=shell_executor, env_accessor=env_accessor)
+  def _create_docker_config(self, file_accessor, env_accessor):
+    envCi = env_accessor.getenv('CI')
+    envDockerAuthConfig = env_accessor.getenv('DOCKER_AUTH_CONFIG')
+    envHome = env_accessor.getenv('HOME')
+    if envCi is not None and envDockerAuthConfig is not None and envHome is not None:
+      dockerConfigPath = path.join(envHome, '.docker/config.json')
+      if file_accessor.load_file(dockerConfigPath) is None:
+        print('NOTICE NOTICE NOTICE')
+        print('CI environment detected and no docker config found.')
+        print(f'Storing content of ${{DOCKER_AUTH_CONFIG}} to file {dockerConfigPath}.')
+        print('NOTICE NOTICE NOTICE')
+        print()
+        file_accessor.save_file(dockerConfigPath, envDockerAuthConfig, overwrite=False)
+        return True
+    return False
 
-  def build_from_config(self, kubedev, container, force_tag, shell_executor, env_accessor):
+
+  def build(self, configFileName, container, file_accessor=RealFileAccessor(), shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
+    return self.build_from_config(
+        self._load_config(configFileName), container=container, force_tag=None, file_accessor=file_accessor, shell_executor=shell_executor, env_accessor=env_accessor)
+
+  def build_from_config(self, kubedev, container, force_tag, file_accessor, shell_executor, env_accessor):
+    if file_accessor is not None:
+      self._create_docker_config(file_accessor, env_accessor)
     images = KubedevConfig.get_images(kubedev, env_accessor)
     if not container in images:
       raise KeyError(
@@ -415,11 +434,12 @@ class Kubedev:
       ]
       return shell_executor.execute(call, dict())
 
-  def push(self, configFileName, container, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
+  def push(self, configFileName, container, file_accessor=RealFileAccessor(), shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.push_from_config(
-        self._load_config(configFileName), container=container, shell_executor=shell_executor, env_accessor=env_accessor)
+        self._load_config(configFileName), container=container, file_accessor=file_accessor, shell_executor=shell_executor, env_accessor=env_accessor)
 
-  def push_from_config(self, kubedev, container, shell_executor, env_accessor):
+  def push_from_config(self, kubedev, container, file_accessor, shell_executor, env_accessor):
+    self._create_docker_config(file_accessor, env_accessor)
     images = KubedevConfig.get_images(kubedev, env_accessor)
     if not container in images:
       raise KeyError(
@@ -534,7 +554,7 @@ class Kubedev:
       image = images[container]
       currentTag = tag_generator.tag()
       buildResult = self.build_from_config(
-          kubedev, container, currentTag, shell_executor=shell_executor, env_accessor=env_accessor)
+          kubedev, container, currentTag, file_accessor=None, shell_executor=shell_executor, env_accessor=env_accessor)
       interactive_flags = "--tty " if shell_executor.is_tty() else ""
 
       if buildResult != 0:
