@@ -22,5 +22,10 @@ spec:
         kubedev-app: %%KUBEDEV_PROJECT_NAME%% # OVERWRITE
         kubedev-deployment: %%KUBEDEV_DEPLOYMENT_NAME%% # OVERWRITE
     spec:
+      securityContext:
+        runAsUser: 2001
+        runAsGroup: 3001
+        fsGroup: 3001
+        runAsNonRoot: true
       imagePullSecrets:
       - name: %%KUBEDEV_IMAGEPULLSECRETS%%

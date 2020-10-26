@@ -82,9 +82,12 @@ class KubedevConfig:
     tag = KubedevConfig.get_tag(env_accessor)
     imageRegistry = kubedev["imageRegistry"]
     name = kubedev["name"]
+    globalUsedFrameworks = kubedev["usedFrameworks"] if "usedFrameworks" in kubedev else []
     if "deployments" in kubedev:
       for deploymentKey, deployment in kubedev["deployments"].items():
         finalDeploymentName = KubedevConfig.collapse_names(name, deploymentKey)
+        localUsedFrameworks = deployment["usedFrameworks"] if "usedFrameworks" in deployment else []
+        usedFrameworks = globalUsedFrameworks + localUsedFrameworks
         images[deploymentKey] = {
             "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
             "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
@@ -92,7 +95,8 @@ class KubedevConfig:
             "ports": deployment['ports'] if 'ports' in deployment else dict(),
             "buildEnvs": {*globalBuildEnvs, *KubedevConfig.load_envs(deployment, True, False)},
             "containerEnvs": {*globalContainerEnvs, *KubedevConfig.load_envs(deployment, False, True)},
-            "volumes": deployment["volumes"]["dev"] if "volumes" in deployment and "dev" in deployment["volumes"] else dict()
+            "volumes": deployment["volumes"]["dev"] if "volumes" in deployment and "dev" in deployment["volumes"] else dict(),
+            "usedFrameworks": usedFrameworks
         }
     return images
 

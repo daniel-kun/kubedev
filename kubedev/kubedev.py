@@ -38,7 +38,7 @@ class RealShellExecutor:
   def execute(self, commandWithArgs, envVars: dict = dict(), piped_input: str = None):
     """
     Execute a shell command.
-    
+
     :param commandWithArgs: the command to execute
     :param envVars: environment variables to set up for the command to execute
     :param piped_input: input to be piped into the command to execute
@@ -153,7 +153,7 @@ class Kubedev:
     self.generate_tiltfile(
         projectName, images, portForwards, file_accessor, overwrite)
 
-    self.generate_projects(images, file_accessor)
+    self.generate_projects(images, file_accessor, template_accessor)
 
     return True
 
@@ -192,6 +192,7 @@ class Kubedev:
       containers = [{
           'name': finalDeploymentName,
           'image': image + ':{{.Values.KUBEDEV_TAG}}',
+          'imagePullPolicy': 'Always',
           'env': [
               {
                   'name': envName,
@@ -203,7 +204,15 @@ class Kubedev:
                   'containerPort': int(value['container'])
               }
               for (portName, value) in ports.items() if 'container' in value
-          ]
+          ],
+          # Security Best Practices:
+          'securityContext': {
+            'allowPrivilegeEscalation': False,
+            'readOnlyRootFilesystem': True,
+            'capabilities': {
+              'drop': ['all']
+            }
+          }
       }]
       deployment['spec']['template']['spec']['containers'] = containers
       deploymentYamlPath = path.join(
@@ -304,13 +313,23 @@ class Kubedev:
 
     file_accessor.save_file('Tiltfile', tiltfile.getvalue(), overwrite)
 
-  def generate_projects(self, images, file_accessor):
+  def generate_projects(self, images, file_accessor, template_accessor):
     for _, imageInfos in images.items():
       path = imageInfos["buildPath"]
-      dockerfile = f'{path}Dockerfile'
-      print(f'🐳 Generating {dockerfile}...')
       file_accessor.mkdirhier(path)
-      file_accessor.save_file(dockerfile, 'FROM scratch\n', False)
+      templateFiles = {"Dockerfile": "Dockerfile"}
+      if "usedFrameworks" in imageInfos:
+        if "pipenv" in imageInfos["usedFrameworks"]:
+          templateFiles = {
+            "Dockerfile": "Dockerfile_pipenv",
+            "app.py": "app.py",
+            "Pipfile": "Pipfile",
+            "Pipfile.lock": "Pipfile.lock",
+          }
+      for targetFile, templateFile in templateFiles.items():
+        targetFilePath = f'{path}{targetFile}'
+        print(f'💾 Generating {targetFilePath}...')
+        file_accessor.save_file(targetFilePath, template_accessor.load_template(templateFile).decode('utf-8'), False)
 
   def _get_kubecontext_arg(self, env_accessor):
     e = env_accessor.getenv('KUBEDEV_KUBECONTEXT')

@@ -51,7 +51,7 @@ Schema of kubedev.json:
     },
     "deployments": {
         "mydeploy": { # An App `mydeploy' of type deployment
-            "used-frameworks": ["python", "pipenv", "npm", "vue"], # Not implemented, yet. used-frameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.
+            "usedFrameworks": ["python", "pipenv", "npm", "vue"], # Not implemented, yet. usedFrameworks are used to e.g. fill in Tiltfile live_update, ignore, etc.
             "ports": {
               "https": {
                   "container": "8081", # This is the port that your actual dockerized service is bound to
@@ -104,6 +104,19 @@ The following files are created for by - with secure defaults:
 - \<your-service\>/Dockerfile
 
 See [Naming Conventions](#naming-conventions).
+
+The following "usedFrameworks" are supported by `kubedev generate`.
+
+### pipenv
+
+When "pipenv" is included in the "usedFrameworks" by either a deployment or globally, the following files are generated inside the \<app\>'s sub-directory:
+
+|File|Description|
+|----|-----------|
+|Dockerfile|Includes pipenv-specific instructions|
+|app.py|An empty python script|
+|Pipfile|A Pipfile using python 3.8. No packages or dev-packages are added.|
+|Pipfile.lock|The result of locking the empty Pipfile.|
 
 ## kubedev check
 

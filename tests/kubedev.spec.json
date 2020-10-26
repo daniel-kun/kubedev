@@ -16,6 +16,7 @@
   },
   "deployments": {
     "foo-deploy": {
+      "usedFrameworks": ["pipenv"],
       "ports": {
         "http": {
           "container": "8081",

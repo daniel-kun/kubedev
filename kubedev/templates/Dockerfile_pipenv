@@ -1,0 +1,19 @@
+FROM python:3.8-slim
+WORKDIR /app/
+RUN pip install pipenv
+
+RUN groupadd --gid 3001 app-group && \
+        useradd --create-home --no-log-init --gid app-group --uid 2001 app-user
+RUN mkdir -p /app && chown -R app-user:app-group /app
+USER app-user
+
+COPY --chown=app-user:app-group Pipfile ./
+COPY --chown=app-user:app-group Pipfile.lock ./
+RUN pipenv install
+
+COPY --chown=app-user:app-group app.py ./
+
+# generate bytecode ahead of time
+RUN python3 -m compileall .
+
+ENTRYPOINT pipenv run python app.py
