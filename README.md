@@ -1,8 +1,10 @@
 # kubedev
 
-DevOps command line tool that standardizes workflows for Microservices in Kubernetes for teams: Build, Develop, CI/CD.
+DevOps command line tool that standardizes workflows for Microservices in Kubernetes for teams:
 
-It builds on:
+> Develop, Build, Secure, Deploy.
+
+It builds on well-known and field-proven tools:
 
 - [docker](https://docker.com/)
 - [tilt](https://tilt.dev/)
@@ -18,11 +20,11 @@ It builds on:
 - `kubedev` aims to be a thin wrapper around the commands it builds on, and just wants to make it easier for teams to call them appropriately.
 - `kubedev` always prints the commands that it executes, so that you know what is going on.
 - `kubedev` heavily relies on environment variables for service configuration.
+- `kubedev` helps you build your services "secure by default".
 
 ## Current state of development
 
-`kubedev` is in early development. Some commands are implemented (see below), but the test coverage is not
-high and there might be some quirks and undocumented behaviour.
+`kubedev` is in early development and used internally by Gira.
 
 ## Synopsis
 
@@ -38,6 +40,7 @@ Schema of kubedev.json:
     "description": "My fancy service 🎆",
     "imagePullSecrets": "foo-creds", # Your docker registry auth credentials
     "imageRegistry": "foo-registry", # Your docker registry
+    "helmReleaseName": "myservice-v1", # An optional name of the helm release. If not specified, 'name' will be used.
     "polaris-config": "/path/to/polaris-config.yaml", # specify a custom configuration file for polaris audits
     "required-envs": {
       "MYSERVICE_ENV": {
@@ -56,7 +59,7 @@ Schema of kubedev.json:
                   "dev": "8083" # This is the port used for local development by either `tilt` or `kubedev run`. Will be available on localhost when using `tilt up` or `kubedev run`.
               }
             },
-            "mounts": {
+            "volumes": {
               "dev": {
                 "host_path": "/container/path" # Mount local directories to container directories when running via `kubedev run`
               }
@@ -77,58 +80,34 @@ Schema of kubedev.json:
 }
 ```
 
-## kubedev init [<deployment:name>, …][<cronjob:name>, …] [<daemonset:name>, …]
+## Naming conventions
 
-_NOT IMPLEMENTED, YET_
+`kubedev` will work with artifacts that follow certain naming conventions that are built from the \<service name\> (top level "name"), the \<app name\> (the "name" inside of "deployments", "daemonsets" and "cronjobs") and a tag, which will be used as the image tag.
 
-Creates:
+|Artifact|Naming Convention|
+|--------|-----------------|
+|helm chart name|The helm chart is generated with the name `<service name>`.|
+|helm release name|The release name is either directly specified using `helmReleaseName` in `kubedev.json`, or is the same as the helm chart name if `helmReleaseName` is not specified.|
+|kubernetes labels|All kubernetes definitions include the labels `kubedev-deployment` (\<service name\>) and `kubedev-app` \<app name\>.|
+|image name|The image name is built using `<imageRegistry>/<service name>-<app name>`, except when \<app name> is the same as \<service name\>, in which case it is collapsed to just `<imageRegistry>/<app name>`|
+|image tag|The tag is either built using `"${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}"`, if both these environment variables are set, or to `none` otherwise.|
 
-- Directories for each deployment, daemonset or cronjob
-- Empty Dockerfiles in these directories
-- A template kubedev.json
-- A README.md template
+## kubedev generate
 
-## kubedev generate [--overwrite]
+Creates artifacts that kick-starts your microservice development.
 
-✔ Implemented
+The following files are created for by - with secure defaults:
 
-Creates a helm-chart (with Deployment and optionally Services), Tiltfile, .gitlab-ci.yml and Dockerfiles and probably subdirectories for each App from the definitions in ./kubedev.json. If ./kubedev.json does not exist, instructions are printed (referencing the "kubedev init" command).
+- Tiltfile
+- .gitlab-ci.yml
+- helm-chart/ with all required kubernetes ressources
+- \<your-service\>/Dockerfile
 
-## kubedev generate helm-chart \<template\>
-
-❌ _NOT IMPLEMENTED, YET_
-
-Creates a helm-chart for this service, according to kubedev.json, consisting of:
-
-- A Chart.yaml
-- A deployment, daemonset or a cronjob, depending on "type".
-- For deployments and daemonsets: Adds a Service (type ClusterIP).
-
-## kubedev generate Tiltfile \<template\>
-
-❌ _NOT IMPLEMENTED, YET_
-
-Creates a Tiltfile with some sensible defaults.
-
-## kubedev generate gitlab-ci
-
-❌ _NOT IMPLEMENTED, YET_
-
-Creates a .gitlab-ci.yml file containing the `build-push` and `deploy` states:
-
-- build-push: Runs `kubedev` build and then `kubedev push`
-- deploy: Runs `kubedev deploy`
-
-It uses the latest stable dev-baseimage.
+See [Naming Conventions](#naming-conventions).
 
 ## kubedev check
 
 Reads kubedev.json and checks whether all environment variables from the configuration is set in the current environment. It prints missing variables, including it's documentation.
-
-❌ __ NOT IMPLEMENTED:__
-
-For used-frameworks "pipenv", it runs `bandit`.
-For used-frameworks "npm", it runs `npm audit`.
 
 ## kubedev audit
 
@@ -136,66 +115,52 @@ Audits the k8s specification using [Fairwind's Polaris](https://github.com/Fairw
 
 A custom configuration file can be specified via the global property `polaris-config`.
 
-## kubedev print env-doc
-
-❌ _NOT IMPLEMENTED, YET_
-
-Prints out a Markdown table with all environment variables declared in kubedev.json and their documentation.
-
-## kubedev up [--clean]
-
-❌ _NOT IMPLEMENTED, YET_
-
-Checks the current environment and runs `tilt up` when the configuration is OK.
-
-For "used-frameworks" "vue", it runs `npm run build -- --watch --mode development` in parallel.
-
-The --clean switch runs `tilt down` before running tilt up.
-
-## kubedev down
-
-❌ _NOT IMPLEMENTED, YET_
-
-Runs `tilt down`.
-
-## kubedev test-ci \<job\>
-
-❌ _NOT IMPLEMENTED, YET_
-
-Creates a temporary branch, commits all local changes and uncommited files to this branch, then runs `gitlab-runner exec shell <job>` and then restores the previous git state.
+*Note:* The polaris executable needs to be available in your $PATH.
 
 ## kubedev build \<app\>
 
-✔ Implemented
+Runs `docker build` for \<app\> with all docker build args as defined in kubedev.json.
 
-Runs `docker build` for \<app\> with all docker build args as defined in kubedev.json. When CI_COMMIT_SHORT_SHA and CI_COMMIT_REF_NAME are set (inside a GitLab CI build job), the tag will be formatted as "${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}", otherwise the tag will be "none".
+See [Naming Conventions](#naming-conventions).
 
-Is used inside the CI/CD build jobs generated by `kubedev generate` and internally by the `kubedev run` command.
+`kubedev build` is used inside the CI/CD build jobs generated by `kubedev generate` and internally by the `kubedev run` command.
 
 ## kubedev push \<app\>
 
-✔ Implemented
+Runs `docker push` for \<app\>.
 
-Runs `docker push` for \<app\>. When CI_COMMIT_SHORT_SHA and CI_COMMIT_REF_NAME are set (inside a GitLab CI build job), the tag will be formatted as "${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}", otherwise the tag will be "none".
+See [Naming Conventions](#naming-conventions).
 
-Is used inside the CI/CD build jobs generated by `kubedev generate`.
+`kubedev push` is used inside the CI/CD build jobs generated by `kubedev generate`.
 
 ## kubedev run \<app\>
 
-✔ Implemented
+Builds an image using `kubedev build` with a random tag and then runs it.
 
-Runs `kubedev build` and then runs the new docker image with all envs set and ports forwarded.
+The following parameters are passed to `docker run`, some of them can be configured in `kubedev.json`:
+
+- `--interactive` and `--rm` are always passed
+- If kubedev is called from a terminal, `--tty` is passed.
+- `required-envs` are forwarded to the container.
+- All `ports.\<port-name\>.dev` will be forwarded to `ports.\<port-name\>.container`
+- `volumes.dev` are passed to the container. kubedev will auto-detect a WSL + Docker Desktop environment and convert the source path to a Windows path using `wsl-path -w`.
 
 ## kubedev deploy
 
-✔ Implemented
+Reads a kube config from the env var $KUBEDEV_KUBECONFIG (required) and optionally a context from $KUBEDEV_KUBECONTEXT and then runs `helm upgrade --install` with appropriate arguments and all env vars from `kubedev.json`.
 
-Reads a kube config from the env var $KUBEDEV_KUBECONFIG (required) and optionally a context from $KUBEDEV_KUBECONTEXT and then runs `helm upgrade --install` with appropriate arguments and env vars from `kubedev.json`.
+See [Naming Conventions](#naming-conventions).
 
-Is used inside the CI/CD build jobs generated by `kubedev generate`.
+The generated image tag is passed to the template using the environment variable KUBEDEV_TAG.
+
+`kubedev deploy` is used inside the CI/CD build jobs generated by `kubedev generate`.
 
 ## kubedev template
 
 Basically runs `helm template` with appropriate arguments and env vars from `kubedev.json`.
 
-Is used inside the Tiltfile generated by `kubedev generate`.
+See [Naming Conventions](#naming-conventions).
+
+The generated image tag is passed to the template using the environment variable KUBEDEV_TAG.
+
+`kubedev template` is used inside the Tiltfile generated by `kubedev generate`.
