@@ -9,10 +9,20 @@ from os import environ, getenv, path
 from uuid import uuid4
 
 import pkg_resources
+import requests
 import yaml
 
 from kubedev.utils import KubedevConfig, YamlMerger
 
+
+class RealDownloader:
+  def download_file_to(self, url: str, headers: dict, target_filename: str, file_accessor) -> bool:
+    response = requests.get(url, headers=headers)
+    if response.ok:
+      file_accessor.save_file(target_filename, response.text, True)
+      return True
+    else:
+      return False
 
 class RealFileAccessor:
   def load_file(self, filename):
@@ -35,26 +45,28 @@ class RealFileAccessor:
 
 
 class RealShellExecutor:
-  def execute(self, commandWithArgs, envVars: dict = dict(), piped_input: str = None):
+  def execute(self, commandWithArgs: list, envVars: dict = dict(), piped_input: str = None):
     """
     Execute a shell command.
 
-    :param commandWithArgs: the command to execute
+    :param commandWithArgs: the commands to execute. Entries with the value None are ignored
     :param envVars: environment variables to set up for the command to execute
     :param piped_input: input to be piped into the command to execute
     """
+    cmds = [cmd for cmd in commandWithArgs if cmd is not None]
     print(
-      f'➡️   Executing "{" ".join(commandWithArgs)}" '
-      f'(additional env vars: {" ".join(envVars.keys())})', 
+      f'➡️   Executing "{" ".join(cmds)}" '
+      f'(additional env vars: {" ".join(envVars.keys())})',
       file=sys.stderr)
-    return subprocess.run(commandWithArgs, 
+    return subprocess.run(cmds,
                           env      = {**environ, **envVars},
-                          input    = piped_input if piped_input else None, 
-                          encoding = "UTF-8"     if piped_input else None, 
+                          input    = piped_input if piped_input else None,
+                          encoding = "UTF-8"     if piped_input else None,
                           ).returncode
 
   def get_output(self, commandWithArgs):
-    cmdResult = subprocess.run(commandWithArgs, check=True, stdout=subprocess.PIPE, encoding='utf-8')
+    cmds = [cmd for cmd in commandWithArgs if cmd is not None]
+    cmdResult = subprocess.run(cmds, check=True, stdout=subprocess.PIPE, encoding='utf-8')
     if cmdResult.returncode == 0:
       return cmdResult.stdout
     else:
@@ -67,6 +79,9 @@ class RealShellExecutor:
 class RealEnvAccessor:
   def getenv(self, name, default=None):
     return getenv(name, default)
+
+  def environ(self):
+    return environ
 
 
 class RealTemplateAccessor:
@@ -371,15 +386,15 @@ class Kubedev:
     return self.template_from_config(
         self._load_config(configFileName), shell_executor, env_accessor, file_accessor)
 
-  def template_from_config(self, 
-                           kubedev, 
-                           shell_executor, 
-                           env_accessor=RealEnvAccessor(), 
+  def template_from_config(self,
+                           kubedev,
+                           shell_executor,
+                           env_accessor=RealEnvAccessor(),
                            file_accessor=RealFileAccessor(),
                            get_output=False):
-    return self._template(kubedev, 
-                                    shell_executor, 
-                                    env_accessor, 
+    return self._template(kubedev,
+                                    shell_executor,
+                                    env_accessor,
                                     file_accessor,
                                     get_output)
 
@@ -453,22 +468,60 @@ class Kubedev:
       ]
       return shell_executor.execute(call, dict())
 
+  def _load_polaris_config(self, kubedev, downloader, file_accessor, env_accessor) -> str:
+    if not "securityChecks" in kubedev:
+      return None
+    securityChecks = kubedev["securityChecks"]
+
+    if not "polaris" in securityChecks:
+      return None
+
+    polarisConfigObject = securityChecks["polaris"]
+    if not "configFile" in polarisConfigObject:
+      return None
+    polarisConfigFile = KubedevConfig.expand_variables(polarisConfigObject["configFile"], env_accessor)
+
+    if "configDownload" in polarisConfigObject:
+      polarisDownloadObject = polarisConfigObject["configDownload"]
+
+      if "url" in polarisDownloadObject:
+        polarisConfigUrl = KubedevConfig.expand_variables(polarisDownloadObject["url"], env_accessor)
+        headersRaw = polarisDownloadObject["headers"] if "headers" in polarisDownloadObject else dict()
+        headers = {KubedevConfig.expand_variables(key, env_accessor):KubedevConfig.expand_variables(value, env_accessor) for key, value in headersRaw.items()}
+        if len(headers) == 0:
+          print(f'INFO: Downloading {polarisDownloadObject["url"]} to local file {polarisConfigFile}.')
+        else:
+          print(f'INFO: Downloading {polarisDownloadObject["url"]} to local file {polarisConfigFile} with headers {list(headers.keys())}.')
+        if not downloader.download_file_to(polarisConfigUrl, headers, polarisConfigFile, file_accessor):
+          print(f"WARNING: Failed to download polaris config from {polarisDownloadObject['url']}, not using a custom polaris config..", file=sys.stderr)
+          return None
+
+    if file_accessor.load_file(polarisConfigFile) == None:
+        print(f"WARNING: Polaris config file {polarisConfigFile} does not exist, not using custom polaris config.", file=sys.stderr)
+        return None
+
+    return polarisConfigFile
+
   def audit(self, configFileName):
     """
     Check a helm-chart for compliance.
 
     :param configFileName: kubedev configuration filename
     """
-    return self.audit_from_config(self._load_config(configFileName))
+    return self.audit_from_config(self._load_config(configFileName),
+                        downloader=RealDownloader(),
+                        file_accessor=RealFileAccessor(),
+                        shell=RealShellExecutor(),
+                        env_accessor=RealEnvAccessor())
 
-  def audit_from_config(self, 
-                        kubedev, 
-                        shell=RealShellExecutor(), 
-                        env_accessor=RealEnvAccessor()):
-    try:
-      polaris_config_exists = False if not kubedev["polaris-config"] else True
-    except KeyError:
-      polaris_config_exists = False
+  def audit_from_config(self,
+                        kubedev,
+                        downloader,
+                        file_accessor,
+                        shell,
+                        env_accessor):
+    polarisConfigFile = self._load_polaris_config(kubedev, downloader, file_accessor, env_accessor)
+
     k8s_spec        = self.template_from_config(
                         kubedev=kubedev,
                         shell_executor=shell,
@@ -476,13 +529,13 @@ class Kubedev:
                         get_output=True)
     polaris_audit   = [ "polaris",
                         "audit",
-                        "--audit-path",
-                        "-",
-                        "--config"                if polaris_config_exists else "",
-                        kubedev["polaris-config"] if polaris_config_exists else "",
+                        "--config" if polarisConfigFile != None else None,
+                        polarisConfigFile if polarisConfigFile != None else None,
                         "--set-exit-code-on-danger",
                         "--format",
-                        "yaml"]
+                        "yaml",
+                        "--audit-path",
+                        "-"]
     audit_exit_code = shell.execute(
                           commandWithArgs = polaris_audit,
                           piped_input     = k8s_spec)
@@ -490,10 +543,10 @@ class Kubedev:
 
   def check(self, configFileName, commands, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_accessor=RealFileAccessor()):
     return self.check_from_config(
-      kubedev       = self._load_config(configFileName, file_accessor), 
-      commands      = commands, 
-      env_accessor  = env_accessor, 
-      printer       = printer, 
+      kubedev       = self._load_config(configFileName, file_accessor),
+      commands      = commands,
+      env_accessor  = env_accessor,
+      printer       = printer,
       file_accessor = file_accessor)
 
   def check_from_config(self, kubedev, commands, env_accessor, printer, file_accessor):

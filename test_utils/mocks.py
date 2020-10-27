@@ -8,7 +8,7 @@ class ShellExecutorMock:
     self._cmd_output = cmd_output
 
   def execute(self, commandWithArgs, envVars=dict(), piped_input: str = None):
-    self._calls.append({'cmd': commandWithArgs, 'env': envVars})
+    self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': envVars})
     return 0
 
   def get_output(self, commandWithArgs):
@@ -55,6 +55,9 @@ class EnvMock:
   def setenv(self, name, value):
     self.envs[name] = value
 
+  def environ(self):
+    return self.envs
+
 
 class TemplateMock:
   def load_template(self, file):
@@ -83,3 +86,17 @@ class TagGeneratorMock:
     if self._current >= len(self._tags):
       self._current = 0
     return result
+
+class DownloadMock:
+  def __init__(self, success: bool, file_content: str):
+    self._success = success
+    self._file_content = file_content
+    self._calls = []
+
+  def download_file_to(self, url: str, headers: dict, target_filename: str, file_accessor) -> bool:
+    self._calls.append([url, headers, target_filename])
+    if self._success:
+      file_accessor.save_file(target_filename, self._file_content, True)
+      return True
+    else:
+      return False

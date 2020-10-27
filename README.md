@@ -41,7 +41,17 @@ Schema of kubedev.json:
     "imagePullSecrets": "foo-creds", # Your docker registry auth credentials
     "imageRegistry": "foo-registry", # Your docker registry
     "helmReleaseName": "myservice-v1", # An optional name of the helm release. If not specified, 'name' will be used.
-    "polaris-config": "/path/to/polaris-config.yaml", # specify a custom configuration file for polaris audits
+    "securityChecks": {
+      "polaris": { # Optional, specify a custom polaris configuration
+        "configFile": "polaris-config-cli.yaml", # Local file name of the polaris config
+        "configDownload": { # Optional, download the polaris config to the local file before running the audit
+          "url": "https://url-to-your-polaris-config",
+          "headers": { # Optional, specify headers added to the GET request to download the polaris config
+            "Authentication": "Bearer ${YOUR_BEARER_TOKEN}"
+          }
+        }
+      }
+    },
     "required-envs": {
       "MYSERVICE_ENV": {
         "documentation": "Describe MYSERVICE_ENV here, so that other devs on your team know how to set them in their own env",
@@ -126,7 +136,16 @@ Reads kubedev.json and checks whether all environment variables from the configu
 
 Audits the k8s specification using [Fairwind's Polaris](https://github.com/FairwindsOps/polaris).
 
-A custom configuration file can be specified via the global property `polaris-config`.
+A custom configuration file can be specified via the configuration options `securityChecks.polaris`, see the example.
+
+Possible configuration options:
+
+|JSON field|Description|
+|----------|-----------|
+|`securityChecks.polaris.configFile`|A path to a local configuration file that is passed to `polaris`. The file must exist or `configDownload` must be specified. Environment variables will be expanded.|
+|`securityChecks.polaris.configDownload`|An optional object that can be used to specify a download path where `kubedev audit` will fetch the polaris configuration from.|
+|`securityChecks.polaris.configDownload.url`|The URL to the polaris config. Environment variables will be expanded. When the object `configDownload` exists, the field `url` is mandatory.|
+|`securityChecks.polaris.configDownload.headers`|An optional dictionary that can contain custom headers that will be passed to the polaris config download. Both the header names and values can include environment variables.|
 
 *Note:* The polaris executable needs to be available in your $PATH.
 

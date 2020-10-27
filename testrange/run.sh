@@ -7,4 +7,4 @@ then
 fi
 
 export KUBEDEV_KUBECONFIG=default
-PYTHONPATH="`pwd`/../" python -m kubedev.cli $* -c ../tests/kubedev.spec.json
+PYTHONPATH="`pwd`/../" python -m kubedev.cli $* -c kubedev.json

@@ -1,4 +1,5 @@
 import os
+from string import Template
 
 kubeconfig_temp_path = os.path.join('.kubedev', 'kube_config_tmp')
 
@@ -180,3 +181,7 @@ class KubedevConfig:
       return kubedev['helmReleaseName']
     else:
       return kubedev['name']
+
+  @staticmethod
+  def expand_variables(text: str, env_accessor) -> str:
+    return Template(text).substitute(env_accessor.environ())
