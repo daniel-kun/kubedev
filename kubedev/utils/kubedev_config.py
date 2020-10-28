@@ -155,7 +155,7 @@ class KubedevConfig:
       file_accessor.mkdirhier(path)
       procVersion = file_accessor.load_file('/proc/version')
       if "Microsoft" in procVersion:
-        return shell_executor.get_output(['wslpath', '-w', path]).rstrip('\n').replace('\\', '\\\\')
+        return shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n').replace('\\', '\\\\')
       else:
         return os.path.abspath(path)
 

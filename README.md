@@ -186,7 +186,7 @@ The following parameters are passed to `docker run`, some of them can be configu
 - If kubedev is called from a terminal, `--tty` is passed.
 - `required-envs` are forwarded to the container.
 - All `ports.\<port-name\>.dev` will be forwarded to `ports.\<port-name\>.container`
-- `volumes.dev` are passed to the container. kubedev will auto-detect a WSL + Docker Desktop environment and convert the source path to a Windows path using `wsl-path -w`.
+- `volumes.dev` are passed to the container. kubedev will auto-detect a WSL + Docker Desktop environment and convert the source path to a Windows path using `wsl-path -aw`.
 
 ## kubedev deploy
 
