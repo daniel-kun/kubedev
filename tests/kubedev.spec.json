@@ -46,6 +46,39 @@
           "build": true,
           "container": false
         }
+      },
+      "systemTest": {
+        "variables": {
+          "FOO_DB_HOST": "postgres",
+          "FOO_DB_USER": "some-user",
+          "FOO_DB_DATABASE": "foodb",
+          "FOO_DB_PASSWORD": "My$ecureP4ssw0rd"
+        },
+        "buildArgs": {
+          "SOME_ARG": "some-value"
+        },
+        "testContainer": {
+          "variables": {
+            "PGPASSWORD": "${FOO_DB_PASSWORD}"
+          }
+        },
+        "services": {
+          "{foo-deploy}": {
+            "hostname": "foo-deploy",
+            "ports": [5000],
+            "variables": {
+              "FOO_DEBUG": "1"
+            }
+          },
+          "postgres:12": {
+            "hostname": "postgres",
+            "ports": [5432],
+            "variables": {
+              "POSTGRES_USER": "${FOO_DB_USER}",
+              "POSTGRES_PASSWORD": "${FOO_DB_PASSWORD}"
+            }
+          }
+        }
       }
     }
   }

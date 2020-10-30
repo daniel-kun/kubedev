@@ -56,6 +56,11 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
   runArgParser.add_argument('container', metavar='Container', type=str,
                              help="The name of the deployment to run locally.")
 
+  systemTestArgParser = argparse.ArgumentParser()
+  add_common_arguments(systemTestArgParser)
+  systemTestArgParser.add_argument('app', metavar='App', type=str,
+                             help="The name of the app to run the system tests for.")
+
   def print_help(argv):
     print('HELP: TODO')
 
@@ -107,6 +112,11 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
     return kubedev.run(args.config, args.container,
                          env_accessor=env_accessor, printer=printer, file_accessor=file_accessor)
 
+  def systemTest(argv):
+    args = systemTestArgParser.parse_args(argv)
+    kubedev = Kubedev()
+    return kubedev.system_test(args.config, args.app)
+
   commands = {
       'generate': generate,
       'template': template,
@@ -116,6 +126,7 @@ def main_impl(argv, env_accessor=RealEnvAccessor(), printer=RealPrinter(), file_
       'check': check,
       'audit': audit,
       'run': run,
+      'system-test': systemTest,
       'help': print_help
   }
 

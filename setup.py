@@ -32,6 +32,7 @@ setuptools.setup(
     },
     install_requires=[
         'pyyaml',
-        'ruamel-yaml'
+        'ruamel-yaml',
+        'colorama'
     ]
 )

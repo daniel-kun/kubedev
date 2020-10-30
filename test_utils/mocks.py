@@ -7,11 +7,11 @@ class ShellExecutorMock:
     self._is_tty = is_tty
     self._cmd_output = cmd_output
 
-  def execute(self, commandWithArgs, envVars=dict(), piped_input: str = None):
+  def execute(self, commandWithArgs, envVars=dict(), piped_input: str = None, check=False):
     self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': envVars})
     return 0
 
-  def get_output(self, commandWithArgs):
+  def get_output(self, commandWithArgs, check=False):
     return self._cmd_output
 
   def is_tty(self):

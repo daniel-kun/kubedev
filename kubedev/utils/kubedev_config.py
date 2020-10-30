@@ -27,10 +27,22 @@ class KubedevConfig:
     return envs
 
   @staticmethod
+  def get_all_app_definitions(kubedev: dict) -> dict:
+    def if_exists(obj: dict, field: str) -> dict:
+      if field in obj:
+        return obj[field]
+      else:
+        return dict()
+
+    return {
+      key: definition for key, definition in {**if_exists(kubedev, 'deployments'), **if_exists(kubedev, 'cronjobs'), **if_exists(kubedev, 'generic')}.items()
+    }
+
+  @staticmethod
   def get_helm_set_env_args(kubedev):
     '''
     Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
-    from a kubedev config. 
+    from a kubedev config.
     '''
     envs = KubedevConfig.get_all_env_names(kubedev, False, True)
 
