@@ -642,6 +642,9 @@ class Kubedev:
       cmdRm = ["docker", "rm", "--force", name]
       shell_executor.execute(cmdRm, check=False) # To be sure, first try to delete the container that we want to create
       cmdCreate = [
+        "/bin/sh",
+        "-c",
+        " ".join([
           "docker",
           "create",
           "--network", network,
@@ -650,7 +653,7 @@ class Kubedev:
           functools.reduce(operator.concat, [["--env", f'{envName}=${{{envName}}}'] for envName in requiredEnvs], []) + \
           functools.reduce(operator.concat, [["--env", f'{varName}={varValue}'] for varName, varValue in variables.items()], []) + \
           functools.reduce(operator.concat, [["--publish", str(port)] for port in ports], []) + \
-          [image]
+          [image])]
       dockerIdRaw = shell_executor.get_output(cmdCreate, check=False)
       print(f"> {dockerIdRaw}")
       if dockerIdRaw is None or dockerIdRaw == "":
@@ -718,7 +721,7 @@ class Kubedev:
 
       systemTestDefinition = app['systemTest']
 
-      # Step 1: Build the system test container
+      # Step #1: Build the system test container
       testContainer = self._field_optional(systemTestDefinition, "testContainer", dict())
       buildArgs = self._field_optional(testContainer, "buildArgs", dict())
       variables = self._field_optional(testContainer, "variables", dict())
@@ -727,16 +730,19 @@ class Kubedev:
       uuid = str(uuid4())[0:8]
       tag = f"local-{appName}-system-tests-{uuid}"
       network = tag
-      #docker build -t "<app-name>.systemTest-<random>" --build-arg {systemTest.buildArgs}  systemTests/<app-name>/
       cmdBuild = [
+        "/bin/sh",
+        "-c",
+        " ".join([
           "docker",
           "build",
           "-t",
           tag
-          ] + functools.reduce(operator.concat, [["--build-args", f"{arg}={value}"] for arg, value in buildArgs.items()], []) + [containerDir]
-      if shell_executor.execute(cmdBuild, check=False) != 0:
+          ] + functools.reduce(operator.concat, [["--build-args", f"{arg}={value}"] for arg, value in buildArgs.items()], []) + [containerDir])]
+      if shell_executor.execute(cmdBuild, envVars=buildArgs, check=False) != 0:
           return False
 
+      # Step #2: Create the docker network
       cmdNetworkCreate = ["docker", "network", "create", network]
       if shell_executor.execute(cmdNetworkCreate, check=False) != 0:
           return False
@@ -744,10 +750,11 @@ class Kubedev:
       result = False
       startedContainers = []
       try:
+          # Step #3: Start the service container
           startedContainers = [
               self._run_docker_detached(
                   network,
-                  self._field_required(service, 'hostname', 'systemTest.service'),
+                  KubedevConfig.expand_variables(self._field_required(service, 'hostname', 'systemTest.service'), env_accessor, self._field_optional(service, 'variables', dict())),
                   self._field_required(service, 'ports', 'systemTest.service'),
                   self._build_image(serviceKey, images),
                   filteredRequiredEnvs,
@@ -755,8 +762,10 @@ class Kubedev:
                   shell_executor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
 
           print(f'{colorama.Fore.YELLOW}TODO: Sleeping for 5 seconds instead of pinging the exposed ports')
+          # Step #4: Wait for the services to become ready
           time.sleep(2)
 
+          # Step #5: Run the system test container
           cmdRunSystemTests = [
               "/bin/sh",
               "-c",
@@ -790,8 +799,10 @@ class Kubedev:
                       print()
                       print(f'{colorama.Fore.RED}^^^ See logs of the service "{startedContainer[1]}" above')
                       print()
+                  # Cleanup #2: Remove the service containers
                   cmdRm = ["docker", "rm", "-f", containerId]
                   shell_executor.execute(cmdRm, check=False)
+          # Cleanup #2: Remove the docker network
           cmdNetworkRm = ["docker", "network", "rm", tag]
           shell_executor.execute(cmdNetworkRm, check=False)
           if result:

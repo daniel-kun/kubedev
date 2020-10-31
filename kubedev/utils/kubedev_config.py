@@ -195,5 +195,5 @@ class KubedevConfig:
       return kubedev['name']
 
   @staticmethod
-  def expand_variables(text: str, env_accessor) -> str:
-    return Template(text).substitute(env_accessor.environ())
+  def expand_variables(text: str, env_accessor, variables: dict = dict()) -> str:
+    return Template(text).substitute({*env_accessor.environ(), *variables})
