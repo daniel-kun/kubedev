@@ -273,6 +273,6 @@ The schematic flow when running the system-test is as follows:
 3. Try to remove left-over services from previous run.
 4. Run all defined services in the background.
 5. Wait for all services to become ready.
-6. Run the system test container in the foreground.
+6. __Run the system test container in the foreground.__
 7. Remove the services containers.
 8. Remove the temporary docker network.

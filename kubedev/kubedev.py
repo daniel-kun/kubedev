@@ -424,11 +424,8 @@ class Kubedev:
     if envCi is not None and envDockerAuthConfig is not None and envHome is not None:
       dockerConfigPath = path.join(envHome, '.docker/config.json')
       if file_accessor.load_file(dockerConfigPath) is None:
-        print('NOTICE NOTICE NOTICE')
-        print('CI environment detected and no docker config found.')
-        print(f'Storing content of ${{DOCKER_AUTH_CONFIG}} to file {dockerConfigPath}.')
-        print('NOTICE NOTICE NOTICE')
-        print()
+        print(f'{colorama.Fore.YELLOW}CI environment detected and no docker config found.')
+        print(f'{colorama.Fore.YELLOW}Storing content of ${{DOCKER_AUTH_CONFIG}} to file {dockerConfigPath}.')
         file_accessor.save_file(dockerConfigPath, envDockerAuthConfig, overwrite=False)
         return True
     return False
@@ -723,6 +720,8 @@ class Kubedev:
       @param systemTestDefinition Is the node "systemTests" from this apps definition
       @param shell_executor Is used to execute shell commands
       '''
+
+      self._create_docker_config(file_accessor, env_accessor)
 
       images = KubedevConfig.get_images(kubedev, env_accessor)
       apps = KubedevConfig.get_all_app_definitions(kubedev)

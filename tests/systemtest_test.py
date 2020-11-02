@@ -331,3 +331,38 @@ class KubeDevSystemTestTests(unittest.TestCase):
           "network",
           "rm",
           "local-foo-deploy-system-tests-abcd"], [call['cmd'] for call in shellMock._calls])
+
+    def test_creates_docker_config_in_ci(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('CI', 'yes')
+        envMock.setenv('CI_COMMIT_SHORT_SHA', 'shacommit')
+        envMock.setenv('CI_COMMIT_REF_NAME', 'branchname')
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        result = sut.system_test_from_config(testDeploymentConfig, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        self.assertIsNotNone(fileMock.load_file('/home/test/.docker/config.json'))
+
+    def test_does_not_create_docker_config_if_not_in_ci(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        result = sut.system_test_from_config(testDeploymentConfig, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        self.assertIsNone(fileMock.load_file('/home/test/.docker/config.json'))
