@@ -117,7 +117,7 @@ class KubeDevRunTests(unittest.TestCase):
 
   def test_run_single_with_volumes_without_tty_in_wsl(self):
     envMock = EnvMock()
-    shell = ShellExecutorMock(is_tty=False, cmd_output='C:\\Projects\\kubedev\\output_docker\n')
+    shell = ShellExecutorMock(is_tty=False, cmd_output=['C:\\Projects\\kubedev\\output_docker\n'])
     outputMock = OutputMock()
     files = FileMock()
     # Simulate WSL:
@@ -152,8 +152,7 @@ class KubeDevRunTests(unittest.TestCase):
       'FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}" ' +
       './foo-deploy/'
     ])
-    print(calls[1]['cmd'])
-    self.assertListEqual(calls[1]['cmd'], [
+    self.assertListEqual(calls[2]['cmd'], [
         '/bin/sh',
         '-c',
         'docker ' +

@@ -1,18 +1,28 @@
 import os
 
 
+class SleepMock:
+  def sleep(self, seconds: float):
+    return None
+
 class ShellExecutorMock:
-  def __init__(self, is_tty=False, cmd_output=None):
+  def __init__(self, is_tty=False, cmd_output: list = []):
     self._calls = []
     self._is_tty = is_tty
     self._cmd_output = cmd_output
 
   def execute(self, commandWithArgs, envVars=dict(), piped_input: str = None, check=False):
-    self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': envVars})
+    self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': envVars, 'withOutput': True})
     return 0
 
   def get_output(self, commandWithArgs, check=False):
-    return self._cmd_output
+    self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': dict(), 'withOutput': True})
+    if len(self._cmd_output) > 0:
+      result = self._cmd_output[0]
+      self._cmd_output = self._cmd_output[1:]
+      return result
+    else:
+      raise Exception('Not enough command output provided in ShellExcutorMock')
 
   def is_tty(self):
     return self._is_tty

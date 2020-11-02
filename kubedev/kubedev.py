@@ -21,6 +21,10 @@ from kubedev.utils import KubedevConfig, YamlMerger
 
 colorama.init(autoreset=True)
 
+class RealSleep:
+  def sleep(self, seconds: float):
+    return time.sleep(seconds)
+
 class RealDownloader:
   def download_file_to(self, url: str, headers: dict, target_filename: str, file_accessor) -> bool:
     response = requests.get(url, headers=headers)
@@ -632,15 +636,18 @@ class Kubedev:
         return shell_executor.execute(command, check=False)
 
   @staticmethod
-  def _run_docker_detached(network: str, name: str, ports: list, image: str, requiredEnvs: list, variables: dict, shell_executor: object) -> (str, bool):
+  def _run_docker_detached(network: str, name: str, ports: list, rawImage: str, images: dict, variables: dict, shell_executor: object) -> (str, bool):
       """
       Starts a container in detached mode and returns it's ID.
 
       Returns None when the start failed.
       """
+      (image, requiredEnvs, isFromKubedev) = Kubedev._build_image(rawImage, images)
+      filteredRequiredEnvs = sorted([env for env in requiredEnvs if not env in variables]) # Note: the sorted() is important, otherwise the order would be
       print(f'Running detached: {name} (image: {image})')
       cmdRm = ["docker", "rm", "--force", name]
       shell_executor.execute(cmdRm, check=False) # To be sure, first try to delete the container that we want to create
+      requiredEnvForwards = functools.reduce(operator.concat, [["--env", f'{envName}="${{{envName}}}"'] for envName in filteredRequiredEnvs], []) if isFromKubedev else []
       cmdCreate = [
         "/bin/sh",
         "-c",
@@ -650,8 +657,8 @@ class Kubedev:
           "--network", network,
           "--name", name,
           "--rm"] + \
-          functools.reduce(operator.concat, [["--env", f'{envName}=${{{envName}}}'] for envName in requiredEnvs], []) + \
-          functools.reduce(operator.concat, [["--env", f'{varName}={varValue}'] for varName, varValue in variables.items()], []) + \
+          requiredEnvForwards + \
+          functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
           functools.reduce(operator.concat, [["--publish", str(port)] for port in ports], []) + \
           [image])]
       dockerIdRaw = shell_executor.get_output(cmdCreate, check=False)
@@ -667,14 +674,14 @@ class Kubedev:
               return (dockerId, name, False)
 
   @staticmethod
-  def _build_image(name: str, images: dict) -> str:
+  def _build_image(name: str, images: dict) -> (str, bool):
       if len(name) > 3 and name[0] == '{' and name[-1] == '}':
           appName = name[1:-1]
           if appName in images:
-              return images[appName]['imageName']
+              return (images[appName]['imageName'], images[appName]['containerEnvs'], True)
           else:
               raise Exception(f'App "{appName}" is referenced by the system test service {name}, but is not defined in kubedev config')
-      return name
+      return (name, dict(), False)
 
   @staticmethod
   def _field_required(obj: dict, field: str, objectName: str):
@@ -690,15 +697,24 @@ class Kubedev:
       else:
           return obj[field]
 
-  def system_test(self, configFileName: str, appName: str, file_accessor=RealFileAccessor(), env_accessor=RealEnvAccessor(), shell_executor=RealShellExecutor()) -> bool:
+  def system_test(self,
+                  configFileName: str,
+                  appName: str,
+                  file_accessor=RealFileAccessor(),
+                  env_accessor=RealEnvAccessor(),
+                  shell_executor=RealShellExecutor(),
+                  tag_generator=TagGenerator(),
+                  sleeper=RealSleep()) -> bool:
     return self.system_test_from_config(
       self._load_config(configFileName, file_accessor),
       appName,
       file_accessor=file_accessor,
       env_accessor=env_accessor,
-      shell_executor=shell_executor)
+      shell_executor=shell_executor,
+      tag_generator=tag_generator,
+      sleeper=sleeper)
 
-  def system_test_from_config(self, kubedev, appName: str, file_accessor, env_accessor, shell_executor) -> bool:
+  def system_test_from_config(self, kubedev, appName: str, file_accessor, env_accessor, shell_executor, tag_generator, sleeper) -> bool:
       '''
       Runs the system tests for an app as defined in the kubedev config.
 
@@ -708,7 +724,6 @@ class Kubedev:
       @param shell_executor Is used to execute shell commands
       '''
 
-      requiredEnvs = KubedevConfig.get_all_env_names(kubedev, build=False, container=True)
       images = KubedevConfig.get_images(kubedev, env_accessor)
       apps = KubedevConfig.get_all_app_definitions(kubedev)
       if not appName in apps:
@@ -722,12 +737,16 @@ class Kubedev:
       systemTestDefinition = app['systemTest']
 
       # Step #1: Build the system test container
+      globalVariables = self._field_optional(systemTestDefinition, "variables", dict())
+
       testContainer = self._field_optional(systemTestDefinition, "testContainer", dict())
       buildArgs = self._field_optional(testContainer, "buildArgs", dict())
-      variables = self._field_optional(testContainer, "variables", dict())
-      filteredRequiredEnvs = [env for env in requiredEnvs if env not in variables]
-      containerDir = f"systemTests/{appName}"
-      uuid = str(uuid4())[0:8]
+      variables = {**globalVariables, **self._field_optional(testContainer, "variables", dict())}
+      requiredEnvs = images[appName]['containerEnvs']
+      filteredRequiredEnvs = sorted([env for env in requiredEnvs if env not in variables])
+
+      containerDir = f"./systemTests/{appName}/"
+      uuid = tag_generator.tag()
       tag = f"local-{appName}-system-tests-{uuid}"
       network = tag
       cmdBuild = [
@@ -738,7 +757,7 @@ class Kubedev:
           "build",
           "-t",
           tag
-          ] + functools.reduce(operator.concat, [["--build-args", f"{arg}={value}"] for arg, value in buildArgs.items()], []) + [containerDir])]
+          ] + functools.reduce(operator.concat, [["--build-args", f'{arg}="{value}"'] for arg, value in buildArgs.items()], []) + [containerDir])]
       if shell_executor.execute(cmdBuild, envVars=buildArgs, check=False) != 0:
           return False
 
@@ -756,14 +775,15 @@ class Kubedev:
                   network,
                   KubedevConfig.expand_variables(self._field_required(service, 'hostname', 'systemTest.service'), env_accessor, self._field_optional(service, 'variables', dict())),
                   self._field_required(service, 'ports', 'systemTest.service'),
-                  self._build_image(serviceKey, images),
-                  filteredRequiredEnvs,
-                  self._field_optional(service, 'variables', dict()),
+                  serviceKey,
+                  images,
+                  {**globalVariables, **self._field_optional(service, 'variables', dict())},
                   shell_executor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
 
-          print(f'{colorama.Fore.YELLOW}TODO: Sleeping for 5 seconds instead of pinging the exposed ports')
+          numSleepSeconds = 5
+          print(f'{colorama.Fore.YELLOW}TODO: Sleeping for {numSleepSeconds} seconds instead of pinging the exposed ports')
           # Step #4: Wait for the services to become ready
-          time.sleep(2)
+          sleeper.sleep(numSleepSeconds)
 
           # Step #5: Run the system test container
           cmdRunSystemTests = [
@@ -776,7 +796,7 @@ class Kubedev:
               "--network", network,
               "--name", f"{appName}-system-tests-{uuid}",
               "--interactive"] + \
-              functools.reduce(operator.concat, [["--env", f'{envName}=${{{envName}}}'] for envName in filteredRequiredEnvs], []) + \
+              functools.reduce(operator.concat, [["--env", f'{envName}="${{{envName}}}"'] for envName in filteredRequiredEnvs], []) + \
               functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
               [tag])]
           if shell_executor.execute(cmdRunSystemTests, check=False) == 0:
@@ -800,7 +820,7 @@ class Kubedev:
                       print(f'{colorama.Fore.RED}^^^ See logs of the service "{startedContainer[1]}" above')
                       print()
                   # Cleanup #2: Remove the service containers
-                  cmdRm = ["docker", "rm", "-f", containerId]
+                  cmdRm = ["docker", "rm", "--force", containerId]
                   shell_executor.execute(cmdRm, check=False)
           # Cleanup #2: Remove the docker network
           cmdNetworkRm = ["docker", "network", "rm", tag]

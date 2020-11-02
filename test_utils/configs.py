@@ -56,6 +56,37 @@ testDeploymentConfig = {
                     "build": True,
                     "container": False
                 }
+            },
+            "systemTest": {
+                "variables": {
+                    "FOO_DEPLOY_TEST_X": "X",
+                    "FOO_DEPLOY_TEST_Y": "Y"
+                },
+                "testContainer": {
+                    "buildArgs": {
+                        "FOO_DEPLOY_TESTBUILD_A": "a"
+                    },
+                    "variables": {
+                        "FOO_DEPLOY_TEST_Z": "Z"
+                    },
+                },
+                "services": {
+                    "{foo-deploy}": {
+                        "hostname": "foo-deploy-test",
+                        "ports": [1234],
+                        "variables": {
+                            "FOO_SERVICE_DEPLOY_ENV1": "fixed-value"
+                        }
+                    },
+                    "postgres:13": {
+                        "hostname": "postgres-test",
+                        "ports": [5432],
+                        "variables": {
+                            "POSTGRES_USER": "tempuser",
+                            "POSTGRES_PASSWORD": "correct horse battery staple"
+                        }
+                    }
+                }
             }
         }
     }

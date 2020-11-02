@@ -54,12 +54,12 @@
           "FOO_DB_DATABASE": "foodb",
           "FOO_DB_PASSWORD": "My$ecureP4ssw0rd"
         },
-        "buildArgs": {
-          "SOME_ARG": "some-value"
-        },
         "testContainer": {
           "variables": {
             "PGPASSWORD": "${FOO_DB_PASSWORD}"
+          },
+          "buildArgs": {
+            "SOME_ARG": "some-value"
           }
         },
         "services": {

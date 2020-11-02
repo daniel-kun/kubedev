@@ -9,7 +9,7 @@ from test_utils import (DownloadMock, EnvMock, FileMock, ShellExecutorMock,
 class KubeDevAuditTests(unittest.TestCase):
     def test_audit_helm_chart(self):
         # ARRANGE
-        shell = ShellExecutorMock()
+        shell = ShellExecutorMock(cmd_output=["asdf"])
         downloader = DownloadMock(True, "")
         fileMock = FileMock()
         env = EnvMock()
@@ -23,7 +23,7 @@ class KubeDevAuditTests(unittest.TestCase):
 
 
         # ASSERT
-        actual_command = shell.calls()[0]["cmd"]
+        actual_command = shell.calls()[1]["cmd"]
         expected_command = [
             "polaris",
             "audit",
@@ -41,7 +41,7 @@ class KubeDevAuditTests(unittest.TestCase):
         config = copy.deepcopy(testDeploymentConfig)
         del config['securityChecks']['polaris']['configDownload'] # Run polaris checks with custom file
 
-        shell = ShellExecutorMock()
+        shell = ShellExecutorMock(cmd_output=["asdf"])
         downloader = DownloadMock(True, "")
         fileMock = FileMock()
         fileMock.save_file("polaris-config-cli-v3.yaml", 'asdf', True)
@@ -55,7 +55,7 @@ class KubeDevAuditTests(unittest.TestCase):
 
 
         # ASSERT
-        actual_command = shell.calls()[0]["cmd"]
+        actual_command = shell.calls()[1]["cmd"]
         expected_command = [
             "polaris",
             "audit",
@@ -73,7 +73,7 @@ class KubeDevAuditTests(unittest.TestCase):
 
     def test_skip_confg_file_if_not_exists(self):
         # ARRANGE
-        shell = ShellExecutorMock()
+        shell = ShellExecutorMock(cmd_output=["asdf"])
         downloader = DownloadMock(True, "")
         fileMock = FileMock()
         env = EnvMock()
@@ -88,7 +88,7 @@ class KubeDevAuditTests(unittest.TestCase):
 
 
         # ASSERT
-        actual_command = shell.calls()[0]["cmd"]
+        actual_command = shell.calls()[1]["cmd"]
         expected_command = [
             "polaris",
             "audit",
@@ -104,7 +104,7 @@ class KubeDevAuditTests(unittest.TestCase):
 
     def test_download_and_expand_env_vars(self):
         # ARRANGE
-        shell = ShellExecutorMock()
+        shell = ShellExecutorMock(cmd_output=["asdf"])
         downloader = DownloadMock(True, "")
         fileMock = FileMock()
         env = EnvMock()
@@ -120,7 +120,7 @@ class KubeDevAuditTests(unittest.TestCase):
 
 
         # ASSERT
-        actual_command = shell.calls()[0]["cmd"]
+        actual_command = shell.calls()[1]["cmd"]
         expected_command = [
             "polaris",
             "audit",
