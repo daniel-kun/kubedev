@@ -1,4 +1,6 @@
+import copy
 import unittest
+from base64 import b64encode
 
 import yaml
 from kubedev import Kubedev
@@ -100,3 +102,54 @@ lkasjfjklsdflkj:
         '--set FOO_SERVICE_DEPLOY_ENV1="${FOO_SERVICE_DEPLOY_ENV1}" --set FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}" ' +
         '--set FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"'
     ], shellCalls[0]['cmd'])
+
+  def test_deploy_with_b64_transformed_variables(self):
+    # ARRANGE
+    shell = ShellExecutorMock()
+    env = EnvMock()
+    binaryValue = "🙂😎😣😪\r\n\t {} $''\"❤"
+    env.setenv('FOO_DEPLOY_BINARY_VALUE', binaryValue)
+    env.setenv('FOO_DEPLOY_GLOBAL_BINARY_VALUE', binaryValue + binaryValue)
+    env.setenv('KUBEDEV_KUBECONFIG', 'default')
+    env.setenv('HOME', '/home/kubedev')
+    files = FileMock()
+
+    # ACT
+    sut = Kubedev()
+    config = copy.deepcopy(testMultiDeploymentsConfig)
+    config['deployments']['foo-deploy']['required-envs']['FOO_DEPLOY_BINARY_VALUE'] = {
+      "documentation": "A value that will be auto-base64 before passing it to helm",
+      "container": True,
+      "build": False,
+      "transform": "base64"
+    }
+    config['required-envs']['FOO_DEPLOY_GLOBAL_BINARY_VALUE'] = {
+      "documentation": "A value that will be auto-base64 before passing it to helm",
+      "container": True,
+      "build": False,
+      "transform": "base64"
+    }
+    sut.deploy_from_config(config, shell, env, files)
+
+    # ASSERT
+    shellCalls = shell.calls()
+    self.assertEqual(1, len(shellCalls))
+    helmTemplateCall = shellCalls[0]
+    helmTemplateEnv = helmTemplateCall['env']
+    helmTemplateCommand = helmTemplateCall['cmd']
+    self.assertListEqual([
+        '/bin/sh',
+        '-c',
+        'helm upgrade foo-service ./helm-chart/ --install --wait --kubeconfig ' +
+        f'/home/kubedev/.kube/config   ' +
+        '--set KUBEDEV_TAG="none" ' +
+        '--set BAR_SERVICE_DEPLOY_ENV1="${BAR_SERVICE_DEPLOY_ENV1}" --set BAR_SERVICE_DEPLOY_ENV2="${BAR_SERVICE_DEPLOY_ENV2}" ' +
+        '--set FOO_DEPLOY_BINARY_VALUE="${FOO_DEPLOY_BINARY_VALUE_AS_BASE64}" --set FOO_DEPLOY_GLOBAL_BINARY_VALUE="${FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64}" ' +
+        '--set FOO_SERVICE_DEPLOY_ENV1="${FOO_SERVICE_DEPLOY_ENV1}" --set FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}" ' +
+        '--set FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" --set FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}"' +
+        ''
+    ], helmTemplateCommand)
+    self.assertIn('FOO_DEPLOY_BINARY_VALUE_AS_BASE64', helmTemplateEnv)
+    self.assertIn('FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64', helmTemplateEnv)
+    self.assertEqual(helmTemplateEnv['FOO_DEPLOY_BINARY_VALUE_AS_BASE64'], b64encode(binaryValue.encode('utf-8')))
+    self.assertEqual(helmTemplateEnv['FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64'], b64encode((binaryValue + binaryValue).encode('utf-8')))

@@ -3,7 +3,8 @@ import unittest
 import yaml
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, ShellExecutorMock,
-                        testDeploymentConfig, testMultiDeploymentsConfig)
+                        configDeploymentBase64Env, testDeploymentConfig,
+                        testMultiDeploymentsConfig)
 
 
 class KubeDevBuildTests(unittest.TestCase):
@@ -148,3 +149,25 @@ class KubeDevBuildTests(unittest.TestCase):
                           file_accessor=fileMock, shell_executor=shellMock, env_accessor=envMock)
 
     self.assertEqual(fileMock.load_file('/home/user/.docker/config.json'), '{767276df-c470-49b5-9904-495806233204}')
+
+  def test_build_transforms_base64_env(self):
+    envMock = EnvMock()
+    envMock.setenv('HOME', '/home/user')
+    fileMock = FileMock()
+    shellMock = ShellExecutorMock()
+    sut = Kubedev()
+    sut.build_from_config(configDeploymentBase64Env, 'foo-deploy', force_tag=None,
+                          file_accessor=fileMock, shell_executor=shellMock, env_accessor=envMock)
+
+    calls = shellMock.calls()
+    self.assertGreaterEqual(len(calls), 1)
+    self.assertListEqual([
+        '/bin/sh',
+        '-c',
+        'docker ' +
+        'build ' +
+        '-t foo-registry/foo-service-foo-deploy:none ' +
+        '--build-arg ' +
+        'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}" ' +
+        './foo-deploy/'
+    ], calls[0]['cmd'])

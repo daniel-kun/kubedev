@@ -74,10 +74,10 @@ class RealShellExecutor:
                           check    = check
                           ).returncode
 
-  def get_output(self, commandWithArgs, check=True):
+  def get_output(self, commandWithArgs, envVars: dict = dict(), check=True):
     cmds = [cmd for cmd in commandWithArgs if cmd is not None]
     print(f'{colorama.Fore.CYAN}➡️   Executing "{" ".join(cmds)}"')
-    cmdResult = subprocess.run(cmds, check=check, stdout=subprocess.PIPE, encoding='utf-8')
+    cmdResult = subprocess.run(cmds, check=check, env=envVars, stdout=subprocess.PIPE, encoding='utf-8')
     if cmdResult.returncode == 0:
       return cmdResult.stdout
     else:
@@ -364,34 +364,36 @@ class Kubedev:
   def _template(self, kubedev, shell_executor, env_accessor, file_accessor, get_output=False):
     variables = KubedevConfig.get_global_variables(kubedev)
     tag = KubedevConfig.get_tag(env_accessor)
+    envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor)
     command = [
         '/bin/sh',
         '-c',
         f'helm template ./helm-chart/ ' +
         f'--set KUBEDEV_TAG="{tag}"' +
-        KubedevConfig.get_helm_set_env_args(kubedev)
+        envs['cmdline']
     ]
     if not get_output:
-      return shell_executor.execute(command, variables)
+      return shell_executor.execute(command, {**variables, **envs['envs']})
     else:
-      return shell_executor.get_output(command)
+      return shell_executor.get_output(command, {**variables, **envs['envs']})
 
   def _deploy(self, kubedev, release_name, shell_executor, env_accessor, file_accessor, get_output=False):
     variables = KubedevConfig.get_global_variables(kubedev)
     tag = KubedevConfig.get_tag(env_accessor)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
+    envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor)
     command = [
         '/bin/sh',
         '-c',
         f'helm upgrade {release_name} ./helm-chart/ --install --wait ' +
         f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
         f'--set KUBEDEV_TAG="{tag}"' +
-        KubedevConfig.get_helm_set_env_args(kubedev)
+        envs['cmdline']
     ]
     if not get_output:
-      return shell_executor.execute(command, variables)
+      return shell_executor.execute(command, {**variables, **envs['envs']})
     else:
-      return shell_executor.get_output(command)
+      return shell_executor.get_output(command, {**variables, **envs['envs']})
 
   def template(self, configFileName, shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor(), file_accessor=RealFileAccessor()):
     return self.template_from_config(
@@ -448,14 +450,15 @@ class Kubedev:
         imageTag = image['imageName']
       else:
         imageTag = f"{image['imageNameTagless']}:{force_tag}"
+      (argsCmdLine, extraEnv) = KubedevConfig.get_docker_build_args(image, env_accessor=env_accessor)
       call = [
           '/bin/sh',
           '-c',
           f"docker build -t {imageTag} " +
-          KubedevConfig.get_docker_build_args(image) +
+          argsCmdLine +
           f"{image['buildPath']}"
       ]
-      return shell_executor.execute(call, check=False)
+      return shell_executor.execute(call, envVars=extraEnv, check=False)
 
   def push(self, configFileName, container, file_accessor=RealFileAccessor(), shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.push_from_config(
@@ -580,8 +583,8 @@ class Kubedev:
             '❌ Required field "imagePullSecrets" is missing in kubedev.json', True)
         result = False
 
-    envs = KubedevConfig.get_all_env_names(kubedev, build=is_command(
-        'build'), container=is_command('deploy') or is_command('template'))
+    envs = KubedevConfig.get_all_envs(kubedev, build=is_command(
+        'build'), container=is_command('deploy') or is_command('template')).keys()
     for env in sorted(envs):
       if isinstance(env_accessor.getenv(env), type(None)):
         printer.print(
@@ -621,16 +624,18 @@ class Kubedev:
       if buildResult != 0:
         return buildResult
       else:
+        (runEnvArgs, extraEnvs) = KubedevConfig.get_docker_run_envs(image, env_accessor=env_accessor)
+
         command = [
           '/bin/sh',
           '-c',
           f"docker run --interactive {interactive_flags}--rm " +
           KubedevConfig.get_docker_run_volumes(image, file_accessor, shell_executor) +
           KubedevConfig.get_docker_run_ports(image) +
-          KubedevConfig.get_docker_run_envs(image) +
+          runEnvArgs +
           f"{image['imageNameTagless']}:{currentTag}"
         ]
-        return shell_executor.execute(command, check=False)
+        return shell_executor.execute(command, envVars=extraEnvs, check=False)
 
   @staticmethod
   def _run_docker_detached(network: str, name: str, ports: list, rawImage: str, images: dict, variables: dict, shell_executor: object) -> (str, bool):
@@ -675,7 +680,7 @@ class Kubedev:
       if len(name) > 3 and name[0] == '{' and name[-1] == '}':
           appName = name[1:-1]
           if appName in images:
-              return (images[appName]['imageName'], images[appName]['containerEnvs'], True)
+              return (images[appName]['imageName'], images[appName]['containerEnvs'].keys(), True)
           else:
               raise Exception(f'App "{appName}" is referenced by the system test service {name}, but is not defined in kubedev config')
       return (name, dict(), False)
@@ -742,7 +747,7 @@ class Kubedev:
       buildArgs = self._field_optional(testContainer, "buildArgs", dict())
       variables = {**globalVariables, **self._field_optional(testContainer, "variables", dict())}
       requiredEnvs = images[appName]['containerEnvs']
-      filteredRequiredEnvs = sorted([env for env in requiredEnvs if env not in variables])
+      (filteredRequiredEnvs, additionalEnvs) = KubedevConfig.prepare_envs(requiredEnvs, env_accessor)
 
       containerDir = f"./systemTests/{appName}/"
       uuid = tag_generator.tag()
@@ -795,10 +800,10 @@ class Kubedev:
               "--network", network,
               "--name", f"{appName}-system-tests-{uuid}",
               "--interactive"] + \
-              functools.reduce(operator.concat, [["--env", f'{envName}="${{{envName}}}"'] for envName in filteredRequiredEnvs], []) + \
+              functools.reduce(operator.concat, [["--env", f'{envName}="${{{attribs["targetName"]}}}"'] for envName, attribs in filteredRequiredEnvs.items()], []) + \
               functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
               [tag])]
-          if shell_executor.execute(cmdRunSystemTests, check=False) == 0:
+          if shell_executor.execute(cmdRunSystemTests, additionalEnvs, check=False) == 0:
               result = True
           else:
               print()

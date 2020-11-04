@@ -3,7 +3,8 @@ import unittest
 
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, ShellExecutorMock, SleepMock,
-                        TagGeneratorMock, testDeploymentConfig)
+                        TagGeneratorMock, configDeploymentBase64Env,
+                        configGlobalBase64Env, testDeploymentConfig)
 
 
 class KubeDevSystemTestTests(unittest.TestCase):
@@ -332,7 +333,7 @@ class KubeDevSystemTestTests(unittest.TestCase):
           "rm",
           "local-foo-deploy-system-tests-abcd"], [call['cmd'] for call in shellMock._calls])
 
-    def test_creates_docker_config_in_ci(self):
+    def test_systemtest_creates_docker_config_in_ci(self):
         fileMock = FileMock()
         envMock = EnvMock()
         envMock.setenv('CI', 'yes')
@@ -351,7 +352,7 @@ class KubeDevSystemTestTests(unittest.TestCase):
 
         self.assertIsNotNone(fileMock.load_file('/home/test/.docker/config.json'))
 
-    def test_does_not_create_docker_config_if_not_in_ci(self):
+    def test_systemtest_does_not_create_docker_config_if_not_in_ci(self):
         fileMock = FileMock()
         envMock = EnvMock()
         envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
@@ -366,3 +367,66 @@ class KubeDevSystemTestTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
         self.assertIsNone(fileMock.load_file('/home/test/.docker/config.json'))
+
+    def test_systemtest_transforms_global_required_env_to_base64(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        result = sut.system_test_from_config(configGlobalBase64Env, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+        self.assertIn([
+            "/bin/sh",
+            "-c",
+            " ".join([
+                "docker",
+                "run",
+                "--rm",
+                "--network",
+                 "local-foo-deploy-system-tests-abcd",
+                "--name", f"foo-deploy-system-tests-abcd",
+                "--interactive",
+                "--env",
+                'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}"',
+                "local-foo-deploy-system-tests-abcd"
+            ])
+        ], [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_transforms_deployment_required_env_to_base64(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        result = sut.system_test_from_config(configDeploymentBase64Env, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            "/bin/sh",
+            "-c",
+            " ".join([
+                "docker",
+                "run",
+                "--rm",
+                "--network",
+                 "local-foo-deploy-system-tests-abcd",
+                "--name", f"foo-deploy-system-tests-abcd",
+                "--interactive",
+                "--env",
+                'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}"',
+                "local-foo-deploy-system-tests-abcd"
+            ])
+        ]
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+        dockerRunCallEnvs = [call['env'] for call in shellMock._calls if call['cmd'] == expectedCall][0]
+        self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', dockerRunCallEnvs)

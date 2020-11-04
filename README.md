@@ -24,7 +24,7 @@ It builds on well-known and field-proven tools:
 
 ## Current state of development
 
-`kubedev` is in early development and used internally by Gira.
+`kubedev` is in early development and used internally at Gira.
 
 ## Synopsis
 
@@ -77,6 +77,10 @@ Schema of kubedev.json:
             "required-envs": {
                 "MYDEPLOY_FLASK_ENV": {
                     "documentation": "..."
+                },
+                "MYDEPLOY_COMPLEX": {
+                  "documentation": "This is a variable with content that can not be passed to the helm chart on the command line and must be base64-encoded.",
+                  "transform": "base64"
                 }
             },
             # Defines the system test for this app. System tests must be defined in the directory ./systemTests/<app-name>/ and must include a Dockerfile:
@@ -149,6 +153,20 @@ When kubedev needs to access docker registries, it writes the content of `${DOCK
 - The environment variable `${HOME}` is set.
 - The environment variable `${CI}` is set.
 - The environment variable `${DOCKER_AUTH_CONFIG}` is set.
+
+## Environment Variable Transformation
+
+Environment Variables are passed to `helm` and `docker` by shell expansion. This has some limitations of values that are not "shell-safe", such as when they contain double-quotes or special shell characters. To make it safe and possible to pass these values, kubedev provides a few transformations.
+
+A transformation will take the content of the variable from the environment where kubedev is called, and pass it in a transformed way into `helm` and `docker.
+
+Available transformations are:
+
+|Transformation|Description|
+|--------------|-----------|
+|base64|Base64 encodes the value|
+
+You can enable a transformation by setting the attribute `transform` in `required-envs` to the desired transformation, e.g. `base64`.
 
 ## kubedev generate
 
@@ -234,7 +252,7 @@ The following parameters are passed to `docker run`, some of them can be configu
 
 ## kubedev deploy
 
-Reads a kube config from the env var $KUBEDEV_KUBECONFIG (required) and optionally a context from $KUBEDEV_KUBECONTEXT and then runs `helm upgrade --install` with appropriate arguments and all env vars from `kubedev.json`.
+Reads a kube config from the env var $KUBEDEV_KUBECONFIG (required) and optionally a context from $KUBEDEV_KUBECONTEXT and then runs `helm upgrade --install` with appropriate arguments and all required env vars from `kubedev.json`.
 
 See [Naming Conventions](#naming-conventions).
 

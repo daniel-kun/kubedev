@@ -2,8 +2,8 @@ import unittest
 
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, OutputMock, ShellExecutorMock,
-                        TagGeneratorMock, testDeploymentConfig,
-                        testMultiDeploymentsConfig)
+                        TagGeneratorMock, configGlobalBase64Env,
+                        testDeploymentConfig, testMultiDeploymentsConfig)
 
 
 class KubeDevRunTests(unittest.TestCase):
@@ -172,3 +172,44 @@ class KubeDevRunTests(unittest.TestCase):
         'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" ' +
         f'foo-registry/foo-service-foo-deploy:{mockTag}'
     ])
+
+  def test_run_transforms_global_required_env_to_base64(self):
+    envMock = EnvMock()
+    shell = ShellExecutorMock(is_tty=False, cmd_output=['C:\\Projects\\kubedev\\output_docker\n'])
+    outputMock = OutputMock()
+    files = FileMock()
+    mockTag = 'slkdjf19'
+    tagGeneratorMock = TagGeneratorMock([mockTag])
+
+    sut = Kubedev()
+
+    returnCode = sut.run_from_config(configGlobalBase64Env, 'foo-deploy', env_accessor=envMock,
+                                     shell_executor=shell, printer=outputMock, file_accessor=files, tag_generator=tagGeneratorMock)
+
+    self.assertEqual(returnCode, 0)
+    calls = shell.calls()
+    self.assertGreaterEqual(len(calls), 2)
+    self.assertListEqual(calls[0]['cmd'], [
+      '/bin/sh',
+      '-c',
+      'docker ' +
+      'build ' +
+      '-t ' +
+      f'foo-registry/foo-service-foo-deploy:{mockTag} ' +
+      '--build-arg ' +
+      'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}" ' +
+      './foo-deploy/'
+    ])
+    self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', calls[0]['env'])
+    self.assertListEqual(calls[1]['cmd'], [
+        '/bin/sh',
+        '-c',
+        'docker ' +
+        'run ' +
+        '--interactive ' +
+        '--rm  ' +
+        '--env ' +
+        'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}" ' +
+        f'foo-registry/foo-service-foo-deploy:{mockTag}'
+    ])
+    self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', calls[1]['env'])
