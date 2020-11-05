@@ -77,7 +77,7 @@ class RealShellExecutor:
   def get_output(self, commandWithArgs, envVars: dict = dict(), check=True):
     cmds = [cmd for cmd in commandWithArgs if cmd is not None]
     print(f'{colorama.Fore.CYAN}➡️   Executing "{" ".join(cmds)}"')
-    cmdResult = subprocess.run(cmds, check=check, env=envVars, stdout=subprocess.PIPE, encoding='utf-8')
+    cmdResult = subprocess.run(cmds, check=check, env={**environ, **envVars}, stdout=subprocess.PIPE, encoding='utf-8')
     if cmdResult.returncode == 0:
       return cmdResult.stdout
     else:
