@@ -8,7 +8,8 @@ from test_utils import (EnvMock, FileMock, testDeploymentConfig,
 class KubedevConfigTests(unittest.TestCase):
 
   def test_get_helm_set_env_args(self):
-    envs = KubedevConfig.get_helm_set_env_args(testDeploymentConfig)
+    envMock = EnvMock()
+    envs = KubedevConfig.get_helm_set_env_args(testDeploymentConfig, envMock)['cmdline']
     self.assertEqual(' --set FOO_SERVICE_DEPLOY_ENV1="${FOO_SERVICE_DEPLOY_ENV1}" --set FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}" --set FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
                      envs)
 

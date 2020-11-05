@@ -1,4 +1,5 @@
 import os
+from base64 import b64encode
 from string import Template
 
 kubeconfig_temp_path = os.path.join('.kubedev', 'kube_config_tmp')
@@ -15,15 +16,14 @@ class KubedevConfig:
     }
 
   @staticmethod
-  def get_all_env_names(kubedev, build, container):
-    envs = set(KubedevConfig.load_envs(
-        kubedev, build=build, container=container).keys())
+  def get_all_envs(kubedev, build, container):
+    envs = KubedevConfig.load_envs(
+        kubedev, build=build, container=container)
     if 'deployments' in kubedev:
       for (_, deployment) in kubedev['deployments'].items():
         deploymentEnvs = KubedevConfig.load_envs(
             deployment, build=build, container=container)
-        envs = {
-            *envs, *set(deploymentEnvs.keys())}
+        envs = {**envs, **deploymentEnvs}
     return envs
 
   @staticmethod
@@ -39,17 +39,40 @@ class KubedevConfig:
     }
 
   @staticmethod
-  def get_helm_set_env_args(kubedev):
+  def prepare_envs(envs: dict, env_accessor: object) -> tuple:
+    def is_base64(attribs: dict) -> bool:
+      return 'transform' in attribs and attribs['transform'] == 'base64'
+
+    def env_name(name: str, attribs: dict) -> str:
+      if 'transform' in attribs and attribs['transform'] == 'base64':
+        return f'{name}_AS_BASE64'
+      else:
+        return name
+
+    sortedEnvs = dict(sorted(envs.items()))
+    return (
+      {name: {**attribs, **{'targetName': env_name(name, attribs)}} for name, attribs in sortedEnvs.items()},
+      {env_name(name, attribs): b64encode(env_accessor.getenv(name, default="").encode('utf-8')) for name, attribs in sortedEnvs.items() if is_base64(attribs)}
+    )
+
+  @staticmethod
+  def get_helm_set_env_args(kubedev: dict, env_accessor: object) -> dict:
     '''
     Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
     from a kubedev config.
     '''
-    envs = KubedevConfig.get_all_env_names(kubedev, False, True)
+    (envs, extraEnvs) = KubedevConfig.prepare_envs(KubedevConfig.get_all_envs(kubedev, False, True), env_accessor=env_accessor)
 
     if len(envs) > 0:
-      return ' ' + ' '.join([f'--set {e}="${{{e}}}"' for e in sorted(envs)])
+      return {
+        'cmdline': ' ' + ' '.join([f'--set {name}="${{{attribs["targetName"]}}}"' for name, attribs in envs.items()]),
+        'envs': extraEnvs
+      }
     else:
-      return ''
+      return {
+        'cmdline': '',
+        'envs': dict()
+      }
 
   @staticmethod
   def get_kubeconfig_path(env_accessor, file_accessor):
@@ -106,8 +129,8 @@ class KubedevConfig:
             "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
             "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
             "ports": deployment['ports'] if 'ports' in deployment else dict(),
-            "buildEnvs": {*globalBuildEnvs, *KubedevConfig.load_envs(deployment, True, False)},
-            "containerEnvs": {*globalContainerEnvs, *KubedevConfig.load_envs(deployment, False, True)},
+            "buildEnvs": {**globalBuildEnvs, **KubedevConfig.load_envs(deployment, True, False)},
+            "containerEnvs": {**globalContainerEnvs, **KubedevConfig.load_envs(deployment, False, True)},
             "volumes": deployment["volumes"]["dev"] if "volumes" in deployment and "dev" in deployment["volumes"] else dict(),
             "usedFrameworks": usedFrameworks
         }
@@ -137,24 +160,30 @@ class KubedevConfig:
       return f'{first}-{second}'
 
   @staticmethod
-  def get_docker_build_args(image):
+  def get_docker_build_args(image: dict, env_accessor: object) -> tuple:
     """
     Returns a string with all "--build-arg ..." parameters to the "docker build ..." call.
 
     :param image: One entry returned from KubedevConfig.get_images()
     """
-    envs = image['buildEnvs']
-    return " ".join([f'--build-arg {env}="${{{env}}}"' for env in sorted(envs)]) + " "
+    (envs, extraEnvs) = KubedevConfig.prepare_envs(image['buildEnvs'], env_accessor=env_accessor)
+    return (
+      " ".join([f'--build-arg {name}="${{{attribs["targetName"]}}}"' for name, attribs in sorted(envs.items())]) + " ",
+      extraEnvs
+    )
 
   @staticmethod
-  def get_docker_run_envs(image):
+  def get_docker_run_envs(image: dict, env_accessor: object) -> tuple:
     """
     Returns a string with all "--env ..." parameters to the "docker run ..." call.
 
     :param image: One entry returned from KubedevConfig.get_images()
     """
-    envs = image['containerEnvs']
-    return " ".join([f'--env {env}="${{{env}}}"' for env in sorted(envs)]) + " "
+    (envs, extraEnvs) = KubedevConfig.prepare_envs(image['containerEnvs'], env_accessor)
+    return (
+      " ".join([f'--env {name}="${{{attribs["targetName"]}}}"' for name, attribs in sorted(envs.items())]) + " ",
+      extraEnvs
+    )
 
   @staticmethod
   def get_docker_run_volumes(image, file_accessor, shell_executor):
