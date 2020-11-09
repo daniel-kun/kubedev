@@ -197,7 +197,9 @@ class KubeDevSystemTestTests(unittest.TestCase):
         sleeper = SleepMock()
 
         sut = Kubedev()
-        result = sut.system_test_from_config(testDeploymentConfig, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+        config = copy.deepcopy(testDeploymentConfig)
+        del config['deployments']['foo-deploy']['volumes']
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
 
         self.assertEqual(result, 0)
 
@@ -261,7 +263,9 @@ class KubeDevSystemTestTests(unittest.TestCase):
         sleeper = SleepMock()
 
         sut = Kubedev()
-        result = sut.system_test_from_config(testDeploymentConfig, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+        config = copy.deepcopy(testDeploymentConfig)
+        del config['deployments']['foo-deploy']['volumes']
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
 
         self.assertEqual(result, 0)
 
@@ -430,3 +434,254 @@ class KubeDevSystemTestTests(unittest.TestCase):
         self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
         dockerRunCallEnvs = [call['env'] for call in shellMock._calls if call['cmd'] == expectedCall][0]
         self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', dockerRunCallEnvs)
+
+    def test_systemtest_mounts_volumes_to_service_shorthand(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-deploy-system-tests-abcd",
+                  "--name",
+                  "foo-deploy-test",
+                  "--rm",
+                  "--volume",
+                  f"{fileMock.abspath('output_docker')}:/test/output",
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
+                  "--env",
+                  'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_X="X"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_Y="Y"',
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV1="fixed-value"',
+                  "--publish",
+                  "1234",
+                  "foo-registry/foo-service-foo-deploy:none",
+            ])
+        ]
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_mounts_volumes_to_service_from_file(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        config['deployments']['foo-deploy']['volumes']['dev']['output_docker'] = {
+            'path': '/test/output'
+        }
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-deploy-system-tests-abcd",
+                  "--name",
+                  "foo-deploy-test",
+                  "--rm",
+                  "--volume",
+                  f"{fileMock.abspath('output_docker')}:/test/output",
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
+                  "--env",
+                  'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_X="X"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_Y="Y"',
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV1="fixed-value"',
+                  "--publish",
+                  "1234",
+                  "foo-registry/foo-service-foo-deploy:none",
+            ])
+        ]
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_mounts_volumes_to_service_raw_rw(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        config['deployments']['foo-deploy']['volumes']['dev'] = {
+            'hello_world': {
+                'path': '/test/output',
+                'content': 'Hello, World!'
+            }
+        }
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        tempFile = f'{fileMock.abspath(".kubedev/temp_hello_world")}'
+        self.assertEqual(fileMock.load_file(tempFile), 'Hello, World!')
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-deploy-system-tests-abcd",
+                  "--name",
+                  "foo-deploy-test",
+                  "--rm",
+                  "--volume",
+                  f"{tempFile}:/test/output",
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
+                  "--env",
+                  'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_X="X"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_Y="Y"',
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV1="fixed-value"',
+                  "--publish",
+                  "1234",
+                  "foo-registry/foo-service-foo-deploy:none",
+            ])
+        ]
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_mounts_volumes_to_service_base64_rw(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        config['deployments']['foo-deploy']['volumes']['dev'] = {
+            'hello_world': {
+                'path': '/test/output',
+                'base64': 'SGVsbG8sIFdvcmxkIQ=='
+            }
+        }
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        tempFile = f'{fileMock.abspath(".kubedev/temp_hello_world")}'
+        self.assertEqual(fileMock.load_file(tempFile), 'Hello, World!')
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-deploy-system-tests-abcd",
+                  "--name",
+                  "foo-deploy-test",
+                  "--rm",
+                  "--volume",
+                  f"{tempFile}:/test/output",
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
+                  "--env",
+                  'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_X="X"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_Y="Y"',
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV1="fixed-value"',
+                  "--publish",
+                  "1234",
+                  "foo-registry/foo-service-foo-deploy:none",
+            ])
+        ]
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_mounts_volumes_to_service_base64_ro(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        config['deployments']['foo-deploy']['volumes']['dev'] = {
+            'hello_world': {
+                'path': '/test/output',
+                'base64': 'SGVsbG8sIFdvcmxkIQ==',
+                'readOnly': True
+            }
+        }
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        tempFile = f'{fileMock.abspath(".kubedev/temp_hello_world")}'
+        self.assertEqual(fileMock.load_file(tempFile), 'Hello, World!')
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-deploy-system-tests-abcd",
+                  "--name",
+                  "foo-deploy-test",
+                  "--rm",
+                  "--volume",
+                  f"{tempFile}:/test/output:ro",
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
+                  "--env",
+                  'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_X="X"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_Y="Y"',
+                  "--env",
+                  'FOO_SERVICE_DEPLOY_ENV1="fixed-value"',
+                  "--publish",
+                  "1234",
+                  "foo-registry/foo-service-foo-deploy:none",
+            ])
+        ]
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])

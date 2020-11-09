@@ -1,5 +1,6 @@
+import itertools
 import os
-from base64 import b64encode
+from base64 import b64decode, b64encode
 from string import Template
 
 kubeconfig_temp_path = os.path.join('.kubedev', 'kube_config_tmp')
@@ -186,24 +187,51 @@ class KubedevConfig:
     )
 
   @staticmethod
-  def get_docker_run_volumes(image, file_accessor, shell_executor):
+  def get_docker_run_volumes_list(image, file_accessor, shell_executor):
     """
     Returns a string with all "--volume ..." parameters to the "docker run ..." call.
 
     :param image: One entry returned from KubedevConfig.get_images()
     """
-    def create_and_normalize(path):
+    def create_and_normalize(path: str) -> str:
       file_accessor.mkdirhier(path)
-      procVersion = file_accessor.load_file('/proc/version')
+      procFile = file_accessor.load_file('/proc/version')
+      procVersion = procFile if procFile is not None else ""
       if "Microsoft" in procVersion:
-        return shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n').replace('\\', '\\\\')
+        effectivePath = shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n')
+        return (effectivePath, effectivePath.replace('\\', '\\\\'))
       else:
-        return os.path.abspath(path)
+        effectivePath = file_accessor.abspath(path)
+        return (effectivePath, effectivePath)
 
-    volumes = image["volumes"]
-    return " ".join([
-      f"--volume {create_and_normalize(hostPath)}:{containerPath}" for hostPath, containerPath in volumes.items()
-    ]) + (" " if len(volumes) > 0 else "")
+    def get_path(hostPath, containerPathSpec) -> str:
+      if type(containerPathSpec) is dict:
+        if 'path' in containerPathSpec:
+          path = containerPathSpec['path']
+          if 'content' in containerPathSpec:
+            (localHostPath, effectiveHostPath) = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
+            file_accessor.save_file(localHostPath, content=containerPathSpec['content'], overwrite=True)
+          elif 'base64' in containerPathSpec:
+            (localHostPath, effectiveHostPath) = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
+            file_accessor.save_file(localHostPath, content=b64decode(containerPathSpec['base64']).decode('utf-8'), overwrite=True)
+          else:
+            (_, effectiveHostPath) = create_and_normalize(hostPath)
+          suffix = ':ro' if 'readOnly' in containerPathSpec and containerPathSpec['readOnly'] == True else ''
+          return f'{effectiveHostPath}:{path}{suffix}'
+        else:
+          raise Exception('Volume specification does not contain required "path" attribute')
+      elif type(containerPathSpec) is str:
+        return f"{create_and_normalize(hostPath)[1]}:{containerPathSpec}"
+      else:
+        raise Exception(f'Volume specification must either be a string, or an object with an "path" property, but is {type(containerPathSpec)} instead.')
+
+    volumes = image["volumes"] if "volumes" in image else dict()
+    return list(itertools.chain(*[["--volume", get_path(hostPath, containerPath)] for hostPath, containerPath in volumes.items()]))
+
+  @staticmethod
+  def get_docker_run_volumes(image, file_accessor, shell_executor):
+    args = KubedevConfig.get_docker_run_volumes_list(image, file_accessor, shell_executor)
+    return " ".join(args) + (" " if len(args) > 0 else "")
 
   @staticmethod
   def get_docker_run_ports(image):

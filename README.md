@@ -71,7 +71,11 @@ Schema of kubedev.json:
             },
             "volumes": {
               "dev": {
-                "host_path": "/container/path" # Mount local directories to container directories when running via `kubedev run`
+                "host_path": {
+                  "path": "/container/path", # Mount local directories to container directories when running via `kubedev run`
+                  "readOnly": true # mount them read-only
+                },
+                "other_path": "/short/path" # Shorthand to mount a path read-write
               }
             },
             "required-envs": {

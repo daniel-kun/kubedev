@@ -48,6 +48,12 @@ class FileMock:
     else:
       return False
 
+  def abspath(self, path):
+    if os.path.isabs(path):
+      return path
+    else:
+      return os.path.join("/kubedev/systemtests/", path)
+
   def mkdirhier(self, path):
     return None
 

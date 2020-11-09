@@ -50,6 +50,9 @@ class RealFileAccessor:
     with open(filename, 'w') as f:
       f.write(content)
 
+  def abspath(self, filepath):
+    return path.abspath(filepath)
+
   def mkdirhier(self, path):
     return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -638,13 +641,21 @@ class Kubedev:
         return shell_executor.execute(command, envVars=extraEnvs, check=False)
 
   @staticmethod
-  def _run_docker_detached(network: str, name: str, ports: list, rawImage: str, images: dict, variables: dict, shell_executor: object) -> (str, bool):
+  def _run_docker_detached(
+    network: str,
+    name: str,
+    ports: list,
+    rawImage: str,
+    images: dict,
+    variables: dict,
+    shell_executor: object,
+    file_accessor: object) -> (str, bool):
       """
       Starts a container in detached mode and returns it's ID.
 
       Returns None when the start failed.
       """
-      (image, requiredEnvs, isFromKubedev) = Kubedev._build_image(rawImage, images)
+      (imageDef, image, requiredEnvs, isFromKubedev) = Kubedev._build_image(rawImage, images)
       filteredRequiredEnvs = sorted([env for env in requiredEnvs if not env in variables]) # Note: the sorted() is important, otherwise the order would be
       print(f'Running detached: {name} (image: {image})')
       cmdRm = ["docker", "rm", "--force", name]
@@ -659,6 +670,7 @@ class Kubedev:
           "--network", network,
           "--name", name,
           "--rm"] + \
+          KubedevConfig.get_docker_run_volumes_list(imageDef, file_accessor, shell_executor) + \
           requiredEnvForwards + \
           functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
           functools.reduce(operator.concat, [["--publish", str(port)] for port in ports], []) + \
@@ -680,10 +692,10 @@ class Kubedev:
       if len(name) > 3 and name[0] == '{' and name[-1] == '}':
           appName = name[1:-1]
           if appName in images:
-              return (images[appName]['imageName'], images[appName]['containerEnvs'].keys(), True)
+              return (images[appName], images[appName]['imageName'], images[appName]['containerEnvs'].keys(), True)
           else:
               raise Exception(f'App "{appName}" is referenced by the system test service {name}, but is not defined in kubedev config')
-      return (name, dict(), False)
+      return (dict(), name, dict(), False)
 
   @staticmethod
   def _field_required(obj: dict, field: str, objectName: str):
@@ -782,7 +794,8 @@ class Kubedev:
                   serviceKey,
                   images,
                   {**globalVariables, **self._field_optional(service, 'variables', dict())},
-                  shell_executor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
+                  shell_executor,
+                  file_accessor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
 
           numSleepSeconds = 5
           print(f'{colorama.Fore.YELLOW}TODO: Sleeping for {numSleepSeconds} seconds instead of pinging the exposed ports')
