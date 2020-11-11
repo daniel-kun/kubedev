@@ -244,7 +244,7 @@ class KubeDevRunTests(unittest.TestCase):
     self.assertEqual(returnCode, 0)
     calls = shell.calls()
     self.assertGreaterEqual(len(calls), 2)
-    self.assertEqual(files.load_file('.kubedev\\temp_hello_world'), 'Hello, World!')
+    self.assertEqual(files.load_file('.kubedev/temp_hello_world'), 'Hello, World!')
     self.assertListEqual(calls[2]['cmd'], [
         '/bin/sh',
         '-c',

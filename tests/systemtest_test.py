@@ -545,7 +545,8 @@ class KubeDevSystemTestTests(unittest.TestCase):
         }
         result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
 
-        tempFile = f'{fileMock.abspath(".kubedev/temp_hello_world")}'
+        tempFile = ".kubedev/temp_hello_world"
+        tempFileAbs = f'{fileMock.abspath(tempFile)}'
         self.assertEqual(fileMock.load_file(tempFile), 'Hello, World!')
 
         self.assertEqual(result, 0)
@@ -561,7 +562,7 @@ class KubeDevSystemTestTests(unittest.TestCase):
                   "foo-deploy-test",
                   "--rm",
                   "--volume",
-                  f"{tempFile}:/test/output",
+                  f"{tempFileAbs}:/test/output",
                   "--env",
                   'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
                   "--env",
@@ -598,7 +599,8 @@ class KubeDevSystemTestTests(unittest.TestCase):
         }
         result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
 
-        tempFile = f'{fileMock.abspath(".kubedev/temp_hello_world")}'
+        tempFile = ".kubedev/temp_hello_world"
+        tempFileAbs = f'{fileMock.abspath(tempFile)}'
         self.assertEqual(fileMock.load_file(tempFile), 'Hello, World!')
 
         self.assertEqual(result, 0)
@@ -614,7 +616,7 @@ class KubeDevSystemTestTests(unittest.TestCase):
                   "foo-deploy-test",
                   "--rm",
                   "--volume",
-                  f"{tempFile}:/test/output",
+                  f"{tempFileAbs}:/test/output",
                   "--env",
                   'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
                   "--env",
@@ -652,7 +654,8 @@ class KubeDevSystemTestTests(unittest.TestCase):
         }
         result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
 
-        tempFile = f'{fileMock.abspath(".kubedev/temp_hello_world")}'
+        tempFile = ".kubedev/temp_hello_world"
+        tempFileAbs = f'{fileMock.abspath(tempFile)}'
         self.assertEqual(fileMock.load_file(tempFile), 'Hello, World!')
 
         self.assertEqual(result, 0)
@@ -668,7 +671,7 @@ class KubeDevSystemTestTests(unittest.TestCase):
                   "foo-deploy-test",
                   "--rm",
                   "--volume",
-                  f"{tempFile}:/test/output:ro",
+                  f"{tempFileAbs}:/test/output:ro",
                   "--env",
                   'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}"',
                   "--env",

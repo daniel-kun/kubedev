@@ -71,11 +71,21 @@ Schema of kubedev.json:
             },
             "volumes": {
               "dev": {
+                "other_path": "/short/path" # Shorthand to mount a path read-write,
                 "host_path": {
                   "path": "/container/path", # Mount local directories to container directories when running via `kubedev run`
                   "readOnly": true # mount them read-only
                 },
-                "other_path": "/short/path" # Shorthand to mount a path read-write
+                "inline_content.txt": {
+                  "content": "Hello, World!", # Mount fixed, plain-text content to a file at 'path'
+                  "path": "/container/path",
+                  "readOnly": true # mount file read-only
+                },
+                "inline_content_base64.txt": {
+                  "path": "/container/path", # Mount fixed, base64-encoded content to a file at 'path'
+                  "base64": "SGVsbG8sIFdvcmxkIQ==",
+                  "readOnly": true # mount file read-only
+                }
               }
             },
             "required-envs": {
@@ -289,7 +299,7 @@ The following configuration options are available:
 |`systemTest.variables`|Defines global variables that are passed as environment variables into the services (if defined) and the system test container|No|
 |`systemTest.testContainer.variables`|Defines variables  that are passed as environment variables into the system test container, but not the services|No|
 |`systemTest.testContainer.buildArgs`|Defines build args that are used when building the system test container|No|
-|`systemTest.testContainer.services`|Defines services that are run in the background when running the system test container. Use the syntax `{\<app name\>` to reference deployments that are defined in this `kubedev.json`, and the image name will be built automatically according to the same rules are `kuebdev build` would|No|
+|`systemTest.testContainer.services`|Defines services that are run in the background when running the system test container. Use the syntax `{\<app name\>` to reference deployments that are defined in this `kubedev.json`, and the image name will be built automatically according to the same rules are `kuebdev build` would. The app's `volumes.dev` are passed to the container as `kubedev run` does.|No|
 |`systemTest.testContainer.services[...].hostname`|This service will be available by this hostname from the system test container|Yes|
 |`systemTest.testContainer.services[...].ports`|Defines ports that are published from this service|No|
 |`systemTest.testContainer.services[...].variables`|Defines additional variables that are passed to this service. When this service references a kubedev deployment, additionally all `required-envs` for this deployment are passed into the service. These values can be overwritten using this variables.|No|

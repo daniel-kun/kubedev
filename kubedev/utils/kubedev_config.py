@@ -198,30 +198,30 @@ class KubedevConfig:
       procFile = file_accessor.load_file('/proc/version')
       procVersion = procFile if procFile is not None else ""
       if "Microsoft" in procVersion:
-        effectivePath = shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n')
-        return (effectivePath, effectivePath.replace('\\', '\\\\'))
+        return shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n').replace('\\', '\\\\')
       else:
-        effectivePath = file_accessor.abspath(path)
-        return (effectivePath, effectivePath)
+        return file_accessor.abspath(path)
 
     def get_path(hostPath, containerPathSpec) -> str:
       if type(containerPathSpec) is dict:
         if 'path' in containerPathSpec:
           path = containerPathSpec['path']
           if 'content' in containerPathSpec:
-            (localHostPath, effectiveHostPath) = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
-            file_accessor.save_file(localHostPath, content=containerPathSpec['content'], overwrite=True)
+            tempFilePath = os.path.join('.kubedev', f'temp_{hostPath}')
+            effectiveHostPath = create_and_normalize(tempFilePath)
+            file_accessor.save_file(tempFilePath, content=containerPathSpec['content'], overwrite=True)
           elif 'base64' in containerPathSpec:
-            (localHostPath, effectiveHostPath) = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
-            file_accessor.save_file(localHostPath, content=b64decode(containerPathSpec['base64']).decode('utf-8'), overwrite=True)
+            tempFilePath = os.path.join('.kubedev', f'temp_{hostPath}')
+            effectiveHostPath = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
+            file_accessor.save_file(tempFilePath, content=b64decode(containerPathSpec['base64']).decode('utf-8'), overwrite=True)
           else:
-            (_, effectiveHostPath) = create_and_normalize(hostPath)
+            effectiveHostPath = create_and_normalize(hostPath)
           suffix = ':ro' if 'readOnly' in containerPathSpec and containerPathSpec['readOnly'] == True else ''
           return f'{effectiveHostPath}:{path}{suffix}'
         else:
           raise Exception('Volume specification does not contain required "path" attribute')
       elif type(containerPathSpec) is str:
-        return f"{create_and_normalize(hostPath)[1]}:{containerPathSpec}"
+        return f"{create_and_normalize(hostPath)}:{containerPathSpec}"
       else:
         raise Exception(f'Volume specification must either be a string, or an object with an "path" property, but is {type(containerPathSpec)} instead.')
 
