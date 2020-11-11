@@ -194,7 +194,6 @@ class KubedevConfig:
     :param image: One entry returned from KubedevConfig.get_images()
     """
     def create_and_normalize(path: str) -> str:
-      file_accessor.mkdirhier(path)
       procFile = file_accessor.load_file('/proc/version')
       procVersion = procFile if procFile is not None else ""
       if "Microsoft" in procVersion:
@@ -208,12 +207,12 @@ class KubedevConfig:
           path = containerPathSpec['path']
           if 'content' in containerPathSpec:
             tempFilePath = os.path.join('.kubedev', f'temp_{hostPath}')
-            effectiveHostPath = create_and_normalize(tempFilePath)
             file_accessor.save_file(tempFilePath, content=containerPathSpec['content'], overwrite=True)
+            effectiveHostPath = create_and_normalize(tempFilePath)
           elif 'base64' in containerPathSpec:
             tempFilePath = os.path.join('.kubedev', f'temp_{hostPath}')
-            effectiveHostPath = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
             file_accessor.save_file(tempFilePath, content=b64decode(containerPathSpec['base64']).decode('utf-8'), overwrite=True)
+            effectiveHostPath = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
           else:
             effectiveHostPath = create_and_normalize(hostPath)
           suffix = ':ro' if 'readOnly' in containerPathSpec and containerPathSpec['readOnly'] == True else ''
