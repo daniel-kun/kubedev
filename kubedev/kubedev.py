@@ -435,6 +435,20 @@ class Kubedev:
         return True
     return False
 
+  def build_from_image(self, image: dict, force_tag: str, env_accessor: object, shell_executor: object) -> int:
+    if force_tag is None:
+      imageTag = image['imageName']
+    else:
+      imageTag = f"{image['imageNameTagless']}:{force_tag}"
+    (argsCmdLine, extraEnv) = KubedevConfig.get_docker_build_args(image, env_accessor=env_accessor)
+    call = [
+        '/bin/sh',
+        '-c',
+        f"docker build -t {imageTag} " +
+        argsCmdLine +
+        f"{image['buildPath']}"
+    ]
+    return shell_executor.execute(call, envVars=extraEnv, check=False)
 
   def build(self, configFileName, container, file_accessor=RealFileAccessor(), shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.build_from_config(
@@ -449,19 +463,7 @@ class Kubedev:
           f"Container {container} is not defined in kubedev config.")
     else:
       image = images[container]
-      if force_tag is None:
-        imageTag = image['imageName']
-      else:
-        imageTag = f"{image['imageNameTagless']}:{force_tag}"
-      (argsCmdLine, extraEnv) = KubedevConfig.get_docker_build_args(image, env_accessor=env_accessor)
-      call = [
-          '/bin/sh',
-          '-c',
-          f"docker build -t {imageTag} " +
-          argsCmdLine +
-          f"{image['buildPath']}"
-      ]
-      return shell_executor.execute(call, envVars=extraEnv, check=False)
+      return self.build_from_image(image, force_tag, env_accessor, shell_executor)
 
   def push(self, configFileName, container, file_accessor=RealFileAccessor(), shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.push_from_config(
@@ -640,14 +642,15 @@ class Kubedev:
         ]
         return shell_executor.execute(command, envVars=extraEnvs, check=False)
 
-  @staticmethod
   def _run_docker_detached(
+    self,
     network: str,
     name: str,
     ports: list,
     rawImage: str,
     images: dict,
     variables: dict,
+    env_accessor: object,
     shell_executor: object,
     file_accessor: object) -> (str, bool):
       """
@@ -660,6 +663,8 @@ class Kubedev:
       print(f'Running detached: {name} (image: {image})')
       cmdRm = ["docker", "rm", "--force", name]
       shell_executor.execute(cmdRm, check=False) # To be sure, first try to delete the container that we want to create
+      if isFromKubedev and env_accessor.getenv('CI') is None:
+        self.build_from_image(imageDef, "none", env_accessor, shell_executor)
       requiredEnvForwards = functools.reduce(operator.concat, [["--env", f'{envName}="${{{envName}}}"'] for envName in filteredRequiredEnvs], []) if isFromKubedev else []
       cmdCreate = [
         "/bin/sh",
@@ -794,6 +799,7 @@ class Kubedev:
                   serviceKey,
                   images,
                   {**globalVariables, **self._field_optional(service, 'variables', dict())},
+                  env_accessor,
                   shell_executor,
                   file_accessor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
 

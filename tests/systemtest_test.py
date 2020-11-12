@@ -688,3 +688,47 @@ class KubeDevSystemTestTests(unittest.TestCase):
             ])
         ]
         self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+
+    def _test_systemtest_builds_services_from_kubedev(self, envMock: object, expected: bool):
+        fileMock = FileMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        result = sut.system_test_from_config(testDeploymentConfig, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+        expectedCall = [
+            '/bin/sh',
+            '-c',
+            'docker ' +
+            'build ' +
+            '-t foo-registry/foo-service-foo-deploy:none ' +
+            '--build-arg ' +
+            'FOO_SERVICE_DEPLOY_ENV1="${FOO_SERVICE_DEPLOY_ENV1}" ' +
+            '--build-arg ' +
+            'FOO_SERVICE_DEPLOY_ENV2="${FOO_SERVICE_DEPLOY_ENV2}" ' +
+            '--build-arg ' +
+            'FOO_SERVICE_DEPLOY_ENV3="${FOO_SERVICE_DEPLOY_ENV3}" ' +
+            '--build-arg ' +
+            'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" ' +
+            '--build-arg ' +
+            'FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}" ' +
+            './foo-deploy/'
+        ]
+        if expected:
+            self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+        else:
+            self.assertNotIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_builds_services_from_kubedev_before_startwhen_not_in_ci(self):
+        envMock = EnvMock()
+        self._test_systemtest_builds_services_from_kubedev(envMock, True)
+
+    def test_systemtest_does_not_build_services_from_kubedev_before_start_when_in_ci(self):
+        envMock = EnvMock()
+        envMock.setenv('CI', 'yes')
+        self._test_systemtest_builds_services_from_kubedev(envMock, False)
