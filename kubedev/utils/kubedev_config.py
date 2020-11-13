@@ -20,11 +20,12 @@ class KubedevConfig:
   def get_all_envs(kubedev, build, container):
     envs = KubedevConfig.load_envs(
         kubedev, build=build, container=container)
-    if 'deployments' in kubedev:
-      for (_, deployment) in kubedev['deployments'].items():
-        deploymentEnvs = KubedevConfig.load_envs(
-            deployment, build=build, container=container)
-        envs = {**envs, **deploymentEnvs}
+    for appType in ['deployments', 'cronjobs']:
+      if appType in kubedev:
+        for (_, deployment) in kubedev[appType].items():
+          deploymentEnvs = KubedevConfig.load_envs(
+              deployment, build=build, container=container)
+          envs = {**envs, **deploymentEnvs}
     return envs
 
   @staticmethod
@@ -120,21 +121,22 @@ class KubedevConfig:
     imageRegistry = kubedev["imageRegistry"]
     name = kubedev["name"]
     globalUsedFrameworks = kubedev["usedFrameworks"] if "usedFrameworks" in kubedev else []
-    if "deployments" in kubedev:
-      for deploymentKey, deployment in kubedev["deployments"].items():
-        finalDeploymentName = KubedevConfig.collapse_names(name, deploymentKey)
-        localUsedFrameworks = deployment["usedFrameworks"] if "usedFrameworks" in deployment else []
-        usedFrameworks = globalUsedFrameworks + localUsedFrameworks
-        images[deploymentKey] = {
-            "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
-            "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
-            "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
-            "ports": deployment['ports'] if 'ports' in deployment else dict(),
-            "buildEnvs": {**globalBuildEnvs, **KubedevConfig.load_envs(deployment, True, False)},
-            "containerEnvs": {**globalContainerEnvs, **KubedevConfig.load_envs(deployment, False, True)},
-            "volumes": deployment["volumes"]["dev"] if "volumes" in deployment and "dev" in deployment["volumes"] else dict(),
-            "usedFrameworks": usedFrameworks
-        }
+    for appType in ["deployments", "cronjobs"]:
+      if appType in kubedev:
+        for deploymentKey, deployment in kubedev[appType].items():
+          finalDeploymentName = KubedevConfig.collapse_names(name, deploymentKey)
+          localUsedFrameworks = deployment["usedFrameworks"] if "usedFrameworks" in deployment else []
+          usedFrameworks = globalUsedFrameworks + localUsedFrameworks
+          images[deploymentKey] = {
+              "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
+              "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
+              "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
+              "ports": deployment['ports'] if 'ports' in deployment else dict(),
+              "buildEnvs": {**globalBuildEnvs, **KubedevConfig.load_envs(deployment, True, False)},
+              "containerEnvs": {**globalContainerEnvs, **KubedevConfig.load_envs(deployment, False, True)},
+              "volumes": deployment["volumes"]["dev"] if "volumes" in deployment and "dev" in deployment["volumes"] else dict(),
+              "usedFrameworks": usedFrameworks
+          }
     return images
 
   @staticmethod

@@ -3,7 +3,8 @@ import unittest
 import yaml
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, ShellExecutorMock,
-                        testDeploymentConfig, testMultiDeploymentsConfig)
+                        testCronJobConfig, testDeploymentConfig,
+                        testMultiDeploymentsConfig)
 
 
 class KubeDevPushTests(unittest.TestCase):
@@ -118,3 +119,34 @@ class KubeDevPushTests(unittest.TestCase):
     sut.push_from_config(config, 'foo-deploy', file_accessor=fileMock, shell_executor=shellMock, env_accessor=envMock)
 
     self.assertEqual(fileMock.load_file('/home/user/.docker/config.json'), '{767276df-c470-49b5-9904-495806233204}')
+
+  def test_push_does_not_overwrite_existing_docker_config_json(self):
+    envMock = EnvMock()
+    envMock.setenv('HOME', '/home/user')
+    fileMock = FileMock()
+    fileMock.save_file('/home/user/.docker/config.json', '{767276df-c470-49b5-9904-495806233204}', overwrite=True)
+    shellMock = ShellExecutorMock()
+    config = testDeploymentConfig.copy()
+    config['name'] = 'foo-deploy'
+
+    sut = Kubedev()
+    sut.push_from_config(config, 'foo-deploy', file_accessor=fileMock, shell_executor=shellMock, env_accessor=envMock)
+
+    self.assertEqual(fileMock.load_file('/home/user/.docker/config.json'), '{767276df-c470-49b5-9904-495806233204}')
+
+  def test_push_cronjob(self):
+    envMock = EnvMock()
+    envMock.setenv('HOME', '/home/user')
+    fileMock = FileMock()
+    shellMock = ShellExecutorMock()
+    sut = Kubedev()
+    sut.push_from_config(testCronJobConfig, 'foo-job', file_accessor=fileMock, shell_executor=shellMock, env_accessor=envMock)
+
+    calls = shellMock._calls
+    self.assertGreaterEqual(1, len(calls))
+    self.assertIn(["/bin/sh", "-c",
+      " ".join([
+        "docker",
+        "push",
+        "foo-registry/foo-service-foo-job:none"
+      ])], [call['cmd'] for call in calls])

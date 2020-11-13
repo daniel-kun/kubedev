@@ -4,7 +4,8 @@ import unittest
 import yaml
 from kubedev import Kubedev, main_impl
 from test_utils import (EnvMock, FileMock, OutputMock, ShellExecutorMock,
-                        testDeploymentConfig, testMultiDeploymentsConfig)
+                        testCronJobConfig, testDeploymentConfig,
+                        testMultiDeploymentsConfig)
 
 
 def _set_all_envs(env):
@@ -263,3 +264,16 @@ class KubeDevCheckTests(unittest.TestCase):
     self.assertNotEqual(0, result)
     self.assertEqual(1, len(messages))
     self.assertIn('FOO_SERVICE_DEPLOY_ENV1', messages[0]['message'])
+
+  def test_check_cronjob_envs(self):
+    envMock = EnvMock()
+    outputMock = OutputMock()
+    fileMock = FileMock()
+
+    sut = Kubedev()
+    result = sut.check_from_config(
+        testCronJobConfig, [], env_accessor=envMock, printer=outputMock, file_accessor=fileMock)
+
+    self.assertFalse(result)
+    messages = outputMock.messages()
+    self.assertEqual(5, len(messages))

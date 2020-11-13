@@ -3,8 +3,8 @@ import unittest
 import yaml
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, ShellExecutorMock,
-                        testDeploymentBase64EnvConfig, testDeploymentConfig,
-                        testMultiDeploymentsConfig)
+                        testCronJobConfig, testDeploymentBase64EnvConfig,
+                        testDeploymentConfig, testMultiDeploymentsConfig)
 
 
 class KubeDevBuildTests(unittest.TestCase):
@@ -171,3 +171,33 @@ class KubeDevBuildTests(unittest.TestCase):
         'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}" ' +
         './foo-deploy/'
     ], calls[0]['cmd'])
+
+  def test_build_cronjob(self):
+    envMock = EnvMock()
+    envMock.setenv('HOME', '/home/user')
+    fileMock = FileMock()
+    shellMock = ShellExecutorMock()
+    sut = Kubedev()
+    sut.build_from_config(testCronJobConfig, 'foo-job', force_tag=None,
+                          file_accessor=fileMock, shell_executor=shellMock, env_accessor=envMock)
+
+    calls = shellMock.calls()
+    self.assertGreaterEqual(len(calls), 1)
+    self.assertIn([
+        '/bin/sh',
+        '-c',
+        'docker ' +
+        'build ' +
+        '-t foo-registry/foo-service-foo-job:none ' +
+        '--build-arg ' +
+        'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" ' +
+        '--build-arg ' +
+        'FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}" ' +
+        '--build-arg ' +
+        'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}" ' +
+        '--build-arg ' +
+        'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}" ' +
+        '--build-arg ' +
+        'FOO_SERVICE_JOB_ENV3="${FOO_SERVICE_JOB_ENV3}" ' +
+        './foo-job/'
+    ], [call['cmd'] for call in calls])

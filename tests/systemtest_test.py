@@ -732,3 +732,33 @@ class KubeDevSystemTestTests(unittest.TestCase):
         envMock = EnvMock()
         envMock.setenv('CI', 'yes')
         self._test_systemtest_builds_services_from_kubedev(envMock, False)
+
+    def test_systemtest_with_unknown_app_does_not_throw_exception(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        result = sut.system_test_from_config(testDeploymentConfig, 'unknown', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertFalse(result)
+
+    def test_systemtest_with_app_that_does_not_define_systemTest_does_not_throw_exception(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{}')
+        envMock.setenv('HOME', '/home/test')
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_foo_deploy'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        del config['deployments']['foo-deploy']['systemTest']
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertFalse(result)

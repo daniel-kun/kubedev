@@ -167,13 +167,16 @@ class Kubedev:
     file_accessor.save_file(path.join(
         'helm-chart', 'Chart.yaml'), _load_template(chartYamlTemplatePath, variables, template_accessor), overwrite)
 
-    portForwards = dict()  # Collect all port-forwards for deployments and daemonsets for tilt
+    portForwards = dict()  # Collect all port-forwards for deployments for tilt
 
     print('⚓ Generating helm-chart...')
     if 'deployments' in kubedev:
       (_, deploymentPortForwards) = self.generate_deployments(
           kubedev, projectName, envs, variables, imageRegistry, file_accessor, template_accessor, overwrite)
       portForwards.update(deploymentPortForwards)
+
+    if 'cronjobs' in kubedev:
+      self.generate_cronjobs(kubedev, projectName, envs, variables, imageRegistry, file_accessor, template_accessor, overwrite)
 
     images = KubedevConfig.get_images(kubedev, env_accessor)
     self.generate_ci(images, kubedev, projectName, envs, variables,
@@ -185,6 +188,43 @@ class Kubedev:
     self.generate_projects(images, file_accessor, template_accessor)
 
     return True
+
+  def generate_cronjobs(self, kubedev, projectName, globalEnvs, variables, imageRegistry, file_accessor, template_accessor, overwrite):
+    for cronjobName, value in kubedev['cronjobs'].items():
+      name = KubedevConfig.collapse_names(projectName, cronjobName)
+      envs = KubedevConfig.load_envs(value, build=False, container=True)
+      additionalVars = {
+          'KUBEDEV_CRONJOB_NAME': name,
+          **variables
+      }
+      templatePath = path.join('helm-chart', 'cronjob.yaml')
+      cronjob = yaml.safe_load(
+          _load_template(templatePath, additionalVars, template_accessor))
+      allEnvs = {**envs, **globalEnvs}
+      image = f'{imageRegistry}/{name}'
+      containers = [{
+          'name': name,
+          'image': image + ':{{.Values.KUBEDEV_TAG}}',
+          'imagePullPolicy': 'Always',
+          'env': [
+              {
+                  'name': envName,
+                  'value': f'{{{{.Values.{envName}}}}}'
+              } for (envName, envDef) in allEnvs.items()],
+          # Security Best Practices:
+          'securityContext': {
+            'allowPrivilegeEscalation': False,
+            'readOnlyRootFilesystem': True,
+            'capabilities': {
+              'drop': ['all']
+            }
+          }
+      }]
+      cronjob['spec']['jobTemplate']['spec']['template']['spec']['containers'] = containers
+      deploymentYamlPath = path.join(
+          'helm-chart', 'templates', 'cronjobs', cronjobName + '.yaml')
+      file_accessor.save_file(
+          deploymentYamlPath, yaml.safe_dump(cronjob), overwrite)
 
   def generate_deployments(self, kubedev, projectName, envs, variables, imageRegistry, file_accessor, template_accessor, overwrite):
     images = dict()  # Collect all images from deployments
@@ -754,6 +794,7 @@ class Kubedev:
       app = apps[appName]
       if not 'systemTest' in app:
         print(f'{colorama.Fore.RED} App {appName} does not define a systemTest.', file=sys.stderr)
+        return False
 
       systemTestDefinition = app['systemTest']
 

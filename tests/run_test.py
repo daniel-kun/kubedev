@@ -3,8 +3,9 @@ from copy import deepcopy
 
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, OutputMock, ShellExecutorMock,
-                        TagGeneratorMock, testDeploymentConfig,
-                        testGlobalBase64EnvConfig, testMultiDeploymentsConfig)
+                        TagGeneratorMock, testCronJobConfig,
+                        testDeploymentConfig, testGlobalBase64EnvConfig,
+                        testMultiDeploymentsConfig)
 
 
 class KubeDevRunTests(unittest.TestCase):
@@ -306,3 +307,58 @@ class KubeDevRunTests(unittest.TestCase):
         f'foo-registry/foo-service-foo-deploy:{mockTag}'
     ])
     self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', calls[1]['env'])
+
+  def test_run_cronjob(self):
+    envMock = EnvMock()
+    shell = ShellExecutorMock(is_tty=True)
+    outputMock = OutputMock()
+    files = FileMock()
+    mockTag = 'slkdjf19'
+    tagGeneratorMock = TagGeneratorMock([mockTag])
+
+    sut = Kubedev()
+
+    returnCode = sut.run_from_config(testCronJobConfig, 'foo-job', env_accessor=envMock,
+                                     shell_executor=shell, printer=outputMock, file_accessor=files, tag_generator=tagGeneratorMock)
+
+    self.assertEqual(returnCode, 0)
+    calls = shell.calls()
+    self.assertGreaterEqual(len(calls), 2)
+    self.assertListEqual(calls[0]['cmd'], [
+      '/bin/sh',
+      '-c',
+      'docker ' +
+      'build ' +
+      '-t ' +
+      f'foo-registry/foo-service-foo-job:{mockTag} ' +
+      '--build-arg ' +
+      'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" ' +
+      '--build-arg ' +
+      'FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}" ' +
+      '--build-arg ' +
+      'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}" ' +
+      '--build-arg ' +
+      'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}" ' +
+      '--build-arg ' +
+      'FOO_SERVICE_JOB_ENV3="${FOO_SERVICE_JOB_ENV3}" ' +
+      './foo-job/'
+    ])
+    print(calls[1]['cmd'])
+    self.assertListEqual(calls[1]['cmd'], [
+        '/bin/sh',
+        '-c',
+        'docker ' +
+        'run ' +
+        '--interactive ' +
+        '--tty ' +
+        '--rm ' +
+        '--volume ' +
+        '/kubedev/systemtests/output_docker:/test/output  ' +
+        '--env ' +
+        'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" ' +
+        '--env ' +
+        'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}" ' +
+        '--env ' +
+        'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}" ' +
+        f'foo-registry/foo-service-foo-job:{mockTag}'
+    ])

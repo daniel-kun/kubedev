@@ -3,6 +3,7 @@ from .build_test import KubeDevBuildTests
 from .check_test import KubeDevCheckTests
 from .deploy_test import KubeDevDeployTests
 from .generate_ci_test import KubeDevGenerateCITests
+from .generate_cronjob_test import KubeDevGenerateCronJobTests
 from .generate_deployment_test import KubeDevGenerateDeploymentTests
 from .generate_dockerfiles_test import KubeDevGenerateDockerfiles
 from .generate_usedframeworks_test import KubeDevGenerateUsedFrameworks

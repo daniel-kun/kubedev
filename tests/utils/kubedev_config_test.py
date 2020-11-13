@@ -1,8 +1,8 @@
 import unittest
 
 from kubedev.utils import KubedevConfig, kubeconfig_temp_path
-from test_utils import (EnvMock, FileMock, testDeploymentConfig,
-                        testMultiDeploymentsConfig)
+from test_utils import (EnvMock, FileMock, testCronJobConfig,
+                        testDeploymentConfig, testMultiDeploymentsConfig)
 
 
 class KubedevConfigTests(unittest.TestCase):
@@ -93,4 +93,17 @@ class KubedevConfigTests(unittest.TestCase):
     self.assertEqual('./', deploy['buildPath'])
 
   def test_get_images_in_ci(self):
-    self.skipTest("Test must be implemented")
+    envMock = EnvMock()
+    envMock.setenv('CI_COMMIT_SHORT_SHA', '2938skld')
+    envMock.setenv('CI_COMMIT_REF_NAME', 'branchy')
+    images = KubedevConfig.get_images(testDeploymentConfig, env_accessor=envMock)
+    self.assertIn('foo-deploy', images)
+    deploy = images['foo-deploy']
+    self.assertIn('imageName', deploy)
+    self.assertEqual('foo-registry/foo-service-foo-deploy:2938skld_branchy', deploy['imageName'])
+    self.assertIn('buildPath', deploy)
+    self.assertEqual('./foo-deploy/', deploy['buildPath'])
+
+  def test_get_cronjob_images(self):
+    images = KubedevConfig.get_images(testCronJobConfig, env_accessor=EnvMock())
+    self.assertIn('foo-job', images)

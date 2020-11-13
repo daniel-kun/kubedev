@@ -6,7 +6,8 @@ import yaml
 from kubedev import Kubedev
 from kubedev.utils import kubeconfig_temp_path
 from test_utils import (EnvMock, FileMock, ShellExecutorMock,
-                        testDeploymentConfig, testMultiDeploymentsConfig)
+                        testCronJobConfig, testDeploymentConfig,
+                        testMultiDeploymentsConfig)
 
 
 class KubeDevDeployTests(unittest.TestCase):
@@ -153,3 +154,42 @@ lkasjfjklsdflkj:
     self.assertIn('FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64', helmTemplateEnv)
     self.assertEqual(helmTemplateEnv['FOO_DEPLOY_BINARY_VALUE_AS_BASE64'], b64encode(binaryValue.encode('utf-8')))
     self.assertEqual(helmTemplateEnv['FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64'], b64encode((binaryValue + binaryValue).encode('utf-8')))
+
+  def test_deploy_cronjob(self):
+    # ARRANGE
+    shell = ShellExecutorMock()
+    env = EnvMock()
+    env.setenv('HOME', '/home/kubedev')
+    env.setenv('KUBEDEV_KUBECONFIG', 'default')
+
+    files = FileMock()
+
+    # ACT
+    sut = Kubedev()
+    sut.deploy_from_config(testCronJobConfig, shell, env, files)
+
+    # ASSERT
+    shellCalls = shell.calls()
+    self.assertEqual(1, len(shellCalls))
+    self.assertIn([
+        '/bin/sh',
+        '-c',
+        " ".join([
+          "helm",
+          "upgrade",
+          "foo-service",
+          "./helm-chart/",
+          "--install",
+          "--wait",
+          "--kubeconfig",
+          "/home/kubedev/.kube/config  ",
+          "--set",
+          'KUBEDEV_TAG="none"',
+          "--set",
+          'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+          "--set",
+          'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}"',
+          "--set",
+          'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}"',
+        ])
+    ], [call['cmd'] for call in shellCalls])

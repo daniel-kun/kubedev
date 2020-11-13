@@ -2,7 +2,8 @@ import unittest
 
 import yaml
 from kubedev import Kubedev
-from test_utils import EnvMock, FileMock, TemplateMock, testDeploymentConfig
+from test_utils import (EnvMock, FileMock, TemplateMock, testCronJobConfig,
+                        testDeploymentConfig)
 
 
 class KubeDevGenerateCITests(unittest.TestCase):
@@ -126,3 +127,29 @@ class KubeDevGenerateCITests(unittest.TestCase):
 
   def test_ci_uses_equal_kubedev_version(self):
     self.skipTest('Not yet implemented: Pinning the kubedev version')
+
+  def test_ci_build_push_cronjob(self):
+    # ARRANGE
+    fileMock = FileMock()
+    envMock = EnvMock()
+    envMock.setenv('CI_COMMIT_SHORT_SHA', 'asdf')
+    envMock.setenv('CI_COMMIT_REF_NAME', '_branch')
+
+    # ACT
+    sut = Kubedev()
+    sut.generate_from_config(testCronJobConfig, False, file_accessor=fileMock, env_accessor=envMock, template_accessor=TemplateMock())
+
+    # ASSERT
+    ciYaml = fileMock.load_file('.gitlab-ci.yml')
+    self.assertIsNotNone(ciYaml)
+    ci = yaml.safe_load(ciYaml)
+    self.assertIn('build-push-foo-job', ci)
+    job = ci['build-push-foo-job']
+    self.assertEqual('build-push', job['stage'])
+    self.assertIn('image', job)
+    self.assertIn('script', job)
+    self.assertIn('variables', job)
+    self.assertIn('KUBEDEV_TAG', job['variables'])
+    self.assertEqual(
+        '${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}', job['variables']['KUBEDEV_TAG'])
+

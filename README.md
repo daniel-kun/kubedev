@@ -30,7 +30,7 @@ It builds on well-known and field-proven tools:
 
 `kubedev` commands are based on the definitions found in `kubedev.json`, which include the minimum necessary information that is required to execute common cloud-dev related tasks.
 
-A kubedev.json describes an "Service", which in turn can contain "Apps" that may be deployments, daemonsets or cronjobs.
+A kubedev.json describes an "Service", which in turn can contain "Apps" that may be deployments or cronjobs.
 
 Schema of kubedev.json:
 
@@ -139,24 +139,32 @@ Schema of kubedev.json:
             }
         }
     },
-    "daemonsets": {
-       # … not implemented, yet
-    },
     "cronjobs": {
-       # … not implemented, yet
+      "myjob": {
+        "volumes": {
+          "dev": {
+            "job_files/": "/tmp/job_files/"
+          }
+        },
+        "required-envs": {
+            "MYJOB_VAR": {
+                "documentation": "..."
+            }
+        },
+      }
     }
 }
 ```
 
 ## Naming conventions
 
-`kubedev` will work with artifacts that follow certain naming conventions that are built from the \<service name\> (top level "name"), the \<app name\> (the "name" inside of "deployments", "daemonsets" and "cronjobs") and a tag, which will be used as the image tag.
+`kubedev` will work with artifacts that follow certain naming conventions that are built from the \<service name\> (top level "name"), the \<app name\> (the "name" inside of "deployments" and "cronjobs") and a tag, which will be used as the image tag.
 
 |Artifact|Naming Convention|
 |--------|-----------------|
 |helm chart name|The helm chart is generated with the name `<service name>`.|
 |helm release name|The release name is either directly specified using `helmReleaseName` in `kubedev.json`, or is the same as the helm chart name if `helmReleaseName` is not specified.|
-|kubernetes labels|All kubernetes definitions include the labels `kubedev-deployment` (\<service name\>) and `kubedev-app` \<app name\>.|
+|kubernetes labels|All kubernetes definitions include the labels `kubedev-deployment` or `kubedev-cronjob` (\<service name\>) and `kubedev-app` \<app name\>.|
 |image name|The image name is built using `<imageRegistry>/<service name>-<app name>`, except when \<app name> is the same as \<service name\>, in which case it is collapsed to just `<imageRegistry>/<app name>`|
 |image tag|The tag is either built using `"${CI_COMMIT_SHORT_SHA}_${CI_COMMIT_REF_NAME}"`, if both these environment variables are set, or to `none` otherwise.|
 
@@ -199,7 +207,7 @@ The following "usedFrameworks" are supported by `kubedev generate`.
 
 ### pipenv
 
-When "pipenv" is included in the "usedFrameworks" by either a deployment or globally, the following files are generated inside the \<app\>'s sub-directory:
+When "pipenv" is included in the "usedFrameworks" by either an app or globally, the following files are generated inside the \<app\>'s sub-directory:
 
 |File|Description|
 |----|-----------|
@@ -286,7 +294,9 @@ The generated image tag is passed to the template using the environment variable
 
 ## kubedev system-test \<app name\>
 
-Runs a system-test container against defined services, which can either be services defined in `kubedev.json`, or services pulled from a registry such as a database or a service defined in another repository.
+Runs containerized system-tests for deployments.
+
+System-test container are run against defined services, which can either be services defined in `kubedev.json`, or services pulled from a registry such as a database or a service defined in another repository.
 
 See [Automatic docker login](#automatic-docker-login)
 

@@ -1,0 +1,30 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  labels:
+    kubedev-app: %%KUBEDEV_PROJECT_NAME%% # OVERWRITE
+    kubedev-cronjob: %%KUBEDEV_CRONJOB_NAME%% # OVERWRITE
+  name: %%KUBEDEV_CRONJOB_NAME%% # OVERWRITE
+spec:
+  schedule: "@daily"
+  successfulJobsHistoryLimit: 10
+  failedJobsHistoryLimit: 30
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            kubedev-app: %%KUBEDEV_PROJECT_NAME%% # OVERWRITE
+            kubedev-cronjob: %%KUBEDEV_CRONJOB_NAME%% # OVERWRITE
+        spec:
+          volumes:
+          - name: tmp-storage
+            emptyDir: {}
+          securityContext:
+            runAsUser: 2001
+            runAsGroup: 3001
+            fsGroup: 3001
+            runAsNonRoot: true
+          imagePullSecrets:
+          - name: %%KUBEDEV_IMAGEPULLSECRETS%%
+          restartPolicy: Never

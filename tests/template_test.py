@@ -5,7 +5,8 @@ from base64 import b64encode
 import yaml
 from kubedev import Kubedev
 from test_utils import (EnvMock, FileMock, ShellExecutorMock,
-                        testDeploymentConfig, testMultiDeploymentsConfig)
+                        testCronJobConfig, testDeploymentConfig,
+                        testMultiDeploymentsConfig)
 
 
 class KubeDevTemplateTests(unittest.TestCase):
@@ -107,3 +108,37 @@ class KubeDevTemplateTests(unittest.TestCase):
     self.assertIn('FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64', helmTemplateEnv)
     self.assertEqual(helmTemplateEnv['FOO_DEPLOY_BINARY_VALUE_AS_BASE64'], b64encode(binaryValue.encode('utf-8')))
     self.assertEqual(helmTemplateEnv['FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64'], b64encode((binaryValue + binaryValue).encode('utf-8')))
+
+  def test_template_cronjob(self):
+    # ARRANGE
+    shell = ShellExecutorMock()
+    env = EnvMock()
+    env.setenv('HOME', '/home/kubedev')
+    env.setenv('KUBEDEV_KUBECONFIG', 'default')
+
+    files = FileMock()
+
+    # ACT
+    sut = Kubedev()
+    sut.template_from_config(testCronJobConfig, shell, env, files)
+
+    # ASSERT
+    shellCalls = shell.calls()
+    self.assertEqual(1, len(shellCalls))
+    self.assertIn([
+        '/bin/sh',
+        '-c',
+        " ".join([
+          "helm",
+          "template",
+          "./helm-chart/",
+          "--set",
+          'KUBEDEV_TAG="none"',
+          "--set",
+          'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+          "--set",
+          'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}"',
+          "--set",
+          'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}"',
+        ])
+    ], [call['cmd'] for call in shellCalls])
