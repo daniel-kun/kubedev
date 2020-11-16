@@ -112,7 +112,8 @@ class RealPrinter:
 
 class TagGenerator:
   def tag(self):
-    return str(uuid4()).replace('-', '')
+    s = str(uuid4())
+    return s[0:s.find('-')]
 
 def _load_template(file, variables, template_accessor):
   content = template_accessor.load_template(file)
@@ -682,6 +683,13 @@ class Kubedev:
         ]
         return shell_executor.execute(command, envVars=extraEnvs, check=False)
 
+  @staticmethod
+  def _build_cluster_config_mounts(clusterConfig: str, file_accessor: object, shell_executor: object) -> list:
+    if clusterConfig != None:
+      return ["--volume", f"{KubedevConfig.wsl_normalize(clusterConfig, file_accessor, shell_executor)}:/tmp/kube_config", "--env", "KUBECONFIG=/tmp/kube_config"]
+    else:
+      return []
+
   def _run_docker_detached(
     self,
     network: str,
@@ -756,6 +764,15 @@ class Kubedev:
       else:
           return obj[field]
 
+  @staticmethod
+  def _rewrite_kubeconfig_to(file: str, host: str, port: int, file_accessor: object):
+    kubeConfFile = file_accessor.load_file(file)
+    if kubeConfFile != None:
+      kubeConf = yaml.safe_load(kubeConfFile)
+      for cluster in kubeConf['clusters']:
+        cluster['cluster']['server'] = f'https://{host}:{port}'
+      file_accessor.save_file(file, yaml.safe_dump(kubeConf), overwrite=True)
+
   def system_test(self,
                   configFileName: str,
                   appName: str,
@@ -811,6 +828,7 @@ class Kubedev:
       uuid = tag_generator.tag()
       tag = f"local-{appName}-system-tests-{uuid}"
       network = tag
+      appType = app['type']
       cmdBuild = [
         "/bin/sh",
         "-c",
@@ -823,10 +841,38 @@ class Kubedev:
       if shell_executor.execute(cmdBuild, envVars=buildArgs, check=False) != 0:
           return False
 
-      # Step #2: Create the docker network
-      cmdNetworkCreate = ["docker", "network", "create", network]
-      if shell_executor.execute(cmdNetworkCreate, check=False) != 0:
-          return False
+      # Step #2: Create the docker network, or spin up a Kind cluster:
+      if appType == 'cronjobs':
+          file_accessor.mkdirhier('.kubedev')
+          serviceName = kubedev['name']
+          clusterName = f'kind-{serviceName}-{uuid}'
+          clusterConfig = f'.kubedev/kind_config_{serviceName}-{uuid}'
+
+          cmdKindCreateCluster = [
+              'kind',
+              'create',
+              'cluster',
+              '--kubeconfig',
+              clusterConfig,
+              '--wait',
+              '10m',
+              '--name',
+              clusterName
+          ]
+          additionalVars = {
+              'KIND_EXPERIMENTAL_DOCKER_NETWORK': network
+          }
+          # Spin up a new one-node Kubernetes-in-Docker cluster via `kind` (https://kind.sigs.k8s.io/)
+          if shell_executor.execute(cmdKindCreateCluster, additionalVars) != 0:
+            return False
+          Kubedev._rewrite_kubeconfig_to(clusterConfig, f"{clusterName}-control-plane", 6443, file_accessor=file_accessor)
+      elif appType == 'deployments':
+          clusterConfig = None
+          cmdNetworkCreate = ["docker", "network", "create", network]
+          if shell_executor.execute(cmdNetworkCreate, check=False) != 0:
+              return False
+      else:
+          raise NotImplementedError(f"Can not run system tests for app type {appType}")
 
       result = False
       startedContainers = []
@@ -860,6 +906,7 @@ class Kubedev:
               "--network", network,
               "--name", f"{appName}-system-tests-{uuid}",
               "--interactive"] + \
+              Kubedev._build_cluster_config_mounts(clusterConfig, file_accessor=file_accessor, shell_executor=shell_executor) + \
               functools.reduce(operator.concat, [["--env", f'{envName}="${{{attribs["targetName"]}}}"'] for envName, attribs in filteredRequiredEnvs.items()], []) + \
               functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
               [tag])]
@@ -886,9 +933,21 @@ class Kubedev:
                   # Cleanup #2: Remove the service containers
                   cmdRm = ["docker", "rm", "--force", containerId]
                   shell_executor.execute(cmdRm, check=False)
-          # Cleanup #2: Remove the docker network
-          cmdNetworkRm = ["docker", "network", "rm", tag]
-          shell_executor.execute(cmdNetworkRm, check=False)
+
+          # Cleanup #2: Remove the docker network / Kind cluster
+          if appType == 'cronjobs':
+              cmdKindDeleteCluster = [
+                  'kind',
+                  'delete',
+                  'cluster',
+                  '--name',
+                  clusterName
+              ]
+              shell_executor.execute(cmdKindDeleteCluster)
+          elif appType == 'deployments':
+              cmdNetworkRm = ["docker", "network", "rm", tag]
+              shell_executor.execute(cmdNetworkRm, check=False)
+
           if result:
               print()
               print(f'{colorama.Fore.GREEN}System tests succeeded! 🌟🎉🥳')

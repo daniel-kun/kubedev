@@ -7,7 +7,7 @@ from test_utils import (EnvMock, FileMock, ShellExecutorMock, SleepMock,
                         testDeploymentConfig, testGlobalBase64EnvConfig)
 
 
-class KubeDevSystemTestTests(unittest.TestCase):
+class KubeDevSystemTestDeploymentTests(unittest.TestCase):
     def test_systemtest_build_without_args(self):
         fileMock = FileMock()
         envMock = EnvMock()
