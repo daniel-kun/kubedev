@@ -112,6 +112,56 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
             ])
         ], calls)
 
+    def test_systemtest_creates_docker_secret(self):
+        # ARRANGE
+        fileMock = FileMock()
+        envMock = EnvMock()
+        envMock.setenv('DOCKER_AUTH_CONFIG', '{"test": true"}')
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(["asdf"])
+        sleepMock = SleepMock()
+
+        # ACT
+        sut = Kubedev()
+        result = sut.system_test_from_config(
+            testCronJobConfig,
+            "foo-job",
+            file_accessor=fileMock,
+            env_accessor=envMock,
+            shell_executor=shellMock,
+            tag_generator=tagMock,
+            sleeper=sleepMock)
+
+        # ASSERT
+        self.assertEquals(result, 0)
+
+        calls = [call['cmd'] for call in shellMock._calls]
+        self.assertIn([
+            "/bin/sh",
+            "-c",
+            " ".join([
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                '--network',
+                'local-foo-job-system-tests-asdf',
+                '--volume',
+                "/kubedev/systemtests/.kubedev/kind_config_foo-service-asdf:/tmp/kube_config",
+                "--env",
+                "DOCKER_AUTH_CONFIG",
+                "bitnami/kubectl:1.18",
+                "--kubeconfig",
+                "/tmp/kube_config",
+                "create",
+                "secret",
+                "generic",
+                "foo-creds",
+                "--type",
+                "kubernetes.io/dockerconfigjson",
+                '--from-literal=.dockerconfigjson="${DOCKER_AUTH_CONFIG}"'
+            ])], calls)
+
     def test_systemtest_builds_apps(self):
         # ARRANGE
         fileMock = FileMock()
@@ -160,8 +210,8 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
     def test_systemtest_runs_test_container_with_kubeconf(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
-        tagMock = TagGeneratorMock(['abcd'])
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd', 'apikey'])
         sleeper = SleepMock()
 
         sut = Kubedev()
@@ -191,6 +241,10 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
                   'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}"',
                   "--env",
                   'POSTGRES_USER="testadmin"',
+                  "--env",
+                  'KUBEDEV_SYSTEMTEST_DAEMON_APIKEY="apikey"',
+                  '--env',
+                  'KUBEDEV_SYSTEMTEST_DAEMON_ENDPOINT="http://kubedev-run-cronjob-api:5000/execute"',
                   "local-foo-job-system-tests-abcd"
                   ])
         ], [call['cmd'] for call in shellMock._calls])
@@ -198,7 +252,7 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
     def test_systemtest_run_with_service_from_registry_with_variables(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -231,7 +285,7 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
     def test_systemtest_changes_kubeconf_servers_to_kind_control_plane(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -271,7 +325,7 @@ users:
     def test_systemtest_inits_helm_and_deploys_to_kind_cluster(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -335,7 +389,7 @@ users:
             '--wait',
             '--kubeconfig',
             '/tmp/kube_config',
-            '--set', 'KUBEDEV_TAG="abcd"',
+            '--set', 'KUBEDEV_TAG=abcd',
             '--set', 'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
             '--set', 'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}"',
             '--set', 'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}"'
@@ -344,7 +398,7 @@ users:
     def test_systemtest_checks_for_tiller_to_become_ready(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['x', '{"status": {}}','{"status": {"availableReplicas": 0}}', '{"status": {"availableReplicas": 1}}'])
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y',  '{"status": {}}','{"status": {"availableReplicas": 0}}', '{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -383,7 +437,7 @@ users:
     def test_systemtest_succeeds_without_env_vars(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -394,3 +448,23 @@ users:
         result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
 
         self.assertEqual(result, 0)
+
+    def test_systemtest_deletes_docker_network(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testCronJobConfig)
+        result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        self.assertIn([
+            'docker',
+            'network',
+            'rm',
+            'local-foo-job-system-tests-abcd'
+        ], [call['cmd'] for call in shellMock._calls])

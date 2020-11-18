@@ -66,7 +66,7 @@ subjects:
         return shell_executor.execute(cmd, piped_input=applyYaml) == 0
 
     @staticmethod
-    def wait_for_deployment(dockerNetwork: str, kubeConfig: str, namespace: str, deploymentName: str, timeout: float, shell_executor: object) -> bool:
+    def wait_for_deployment(dockerNetwork: str, kubeConfig: str, namespace: str, deploymentName: str, timeout: float, shell_executor: object, sleeper: object) -> bool:
         '''
         Waits for a Kubernetes deployment to become available (availableReplicas > 0)
         '''
@@ -103,4 +103,25 @@ subjects:
                     print(deploymentJson)
                     return False
                 else:
-                  time.sleep(1)
+                  sleeper.sleep(1)
+
+    @staticmethod
+    def kubectl(dockerNetwork: str, kubeConfig: str, variables: set, commands: list, shell_executor: object) -> int:
+      cmd = [
+        "/bin/sh",
+        "-c",
+        " ".join([
+          'docker',
+          'run',
+          '-i',
+          '--rm',
+          '--network',
+          dockerNetwork,
+          '--volume',
+          f'{kubeConfig}:/tmp/kube_config'] + \
+          [arg for args in [["--env", variable] for variable in variables] for arg in args] + \
+          ['bitnami/kubectl:1.18',
+          '--kubeconfig',
+          '/tmp/kube_config'] + commands)
+      ]
+      return shell_executor.execute(cmd)

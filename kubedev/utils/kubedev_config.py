@@ -142,6 +142,7 @@ class KubedevConfig:
           images[deploymentKey] = {
               "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
               "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
+              "appName": finalDeploymentName,
               "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
               "ports": deployment['ports'] if 'ports' in deployment else dict(),
               "buildEnvs": {**globalBuildEnvs, **KubedevConfig.load_envs(deployment, True, False)},
