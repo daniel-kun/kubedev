@@ -3,6 +3,7 @@ import unittest
 
 import yaml
 from kubedev import Kubedev
+from kubedev.utils import KubernetesTools
 from test_utils import (EnvMock, FileMock, ShellExecutorMock, SleepMock,
                         TagGeneratorMock, testCronJobConfig)
 
@@ -111,10 +112,55 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
             ])
         ], calls)
 
+    def test_systemtest_builds_apps(self):
+        # ARRANGE
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock()
+        tagMock = TagGeneratorMock(["asdf"])
+        sleepMock = SleepMock()
+
+        # ACT
+        sut = Kubedev()
+        result = sut.system_test_from_config(
+            testCronJobConfig,
+            "foo-job",
+            file_accessor=fileMock,
+            env_accessor=envMock,
+            shell_executor=shellMock,
+            tag_generator=tagMock,
+            sleeper=sleepMock)
+
+        # ASSERT
+        self.assertTrue(result)
+
+        calls = [call['cmd'] for call in shellMock._calls]
+        self.assertIn([
+            "/bin/sh",
+            "-c",
+            " ".join([
+                "docker",
+                "build",
+                "-t",
+                'foo-registry/foo-service-foo-job:asdf',
+                '--build-arg',
+                'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+                '--build-arg',
+                'FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}"',
+                '--build-arg',
+                'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}"',
+                '--build-arg',
+                'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}"',
+                '--build-arg',
+                'FOO_SERVICE_JOB_ENV3="${FOO_SERVICE_JOB_ENV3}"',
+                './foo-job/'
+            ])
+        ], calls)
+
     def test_systemtest_runs_test_container_with_kubeconf(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres', 'docker_id_'])
+        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -152,7 +198,7 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
     def test_systemtest_run_with_service_from_registry_with_variables(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres'])
+        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -185,7 +231,7 @@ class KubeDevSystemTestCronJobTests(unittest.TestCase):
     def test_systemtest_changes_kubeconf_servers_to_kind_control_plane(self):
         fileMock = FileMock()
         envMock = EnvMock()
-        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres'])
+        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
         tagMock = TagGeneratorMock(['abcd'])
         sleeper = SleepMock()
 
@@ -221,3 +267,130 @@ users:
         kubeConf = yaml.safe_load(kubeConfFile)
         for cluster in kubeConf['clusters']:
             self.assertEqual(f'https://kind-foo-service-abcd-control-plane:6443', cluster['cluster']['server'])
+
+    def test_systemtest_inits_helm_and_deploys_to_kind_cluster(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testCronJobConfig)
+        result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        expectedKubeCtlApply = [
+            'docker',
+            'run',
+            '-i',
+            '--rm',
+            '--network',
+            'local-foo-job-system-tests-abcd',
+            '--volume',
+            '/kubedev/systemtests/.kubedev/kind_config_foo-service-abcd:/tmp/kube_config',
+            'bitnami/kubectl:1.18',
+            '--kubeconfig',
+            '/tmp/kube_config',
+            'apply',
+            '-f',
+            '-']
+        self.assertIn(expectedKubeCtlApply, [call['cmd'] for call in shellMock._calls])
+        kubeCtlApplyCal = [call for call in shellMock._calls if call['cmd'] == expectedKubeCtlApply][0]
+        self.assertEqual(KubernetesTools.get_tiller_rbac_setup(), kubeCtlApplyCal['pipedInput'])
+
+        self.assertIn([
+            'docker',
+            'run',
+            '-i',
+            '--rm',
+            '--network',
+            'local-foo-job-system-tests-abcd',
+            '--volume',
+            '/kubedev/systemtests/.kubedev/kind_config_foo-service-abcd:/tmp/kube_config',
+            'alpine/helm:2.16.9',
+            '--kubeconfig',
+            '/tmp/kube_config',
+            'init',
+            '--service-account',
+            'tiller'], [call['cmd'] for call in shellMock._calls])
+
+        self.assertIn([
+            'docker',
+            'run',
+            '-i',
+            '--rm',
+            '--network',
+            'local-foo-job-system-tests-abcd',
+            '--volume',
+            '/kubedev/systemtests/.kubedev/kind_config_foo-service-abcd:/tmp/kube_config',
+            '--volume',
+            '/kubedev/systemtests/helm-chart/:/app/helm-chart/',
+            'alpine/helm:2.16.9',
+            'upgrade',
+            'local-foo-job-system-tests-abcd',
+            '/app/helm-chart/',
+            '--install',
+            '--wait',
+            '--kubeconfig',
+            '/tmp/kube_config',
+            '--set', 'KUBEDEV_TAG="abcd"',
+            '--set', 'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}"',
+            '--set', 'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}"',
+            '--set', 'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2}"'
+            ], [call['cmd'] for call in shellMock._calls])
+
+    def test_systemtest_checks_for_tiller_to_become_ready(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['x', '{"status": {}}','{"status": {"availableReplicas": 0}}', '{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testCronJobConfig)
+        result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        expectedCall = [
+            'docker',
+            'run',
+            '-i',
+            '--rm',
+            '--network',
+            'local-foo-job-system-tests-abcd',
+            '--volume',
+            '/kubedev/systemtests/.kubedev/kind_config_foo-service-abcd:/tmp/kube_config',
+            'bitnami/kubectl:1.18',
+            '--kubeconfig',
+            '/tmp/kube_config',
+            '--namespace',
+            'kube-system',
+            'get',
+            'deployments',
+            'tiller-deploy',
+            '-o',
+            'json'
+            ]
+
+        self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
+        checkTillerCommands = [call['cmd'] for call in shellMock._calls if call['cmd'] == expectedCall]
+        self.assertEqual(3, len(checkTillerCommands))
+
+
+    def test_systemtest_succeeds_without_env_vars(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['x','{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testCronJobConfig)
+        del config['required-envs']
+        del config['cronjobs']['foo-job']['required-envs']
+        result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)

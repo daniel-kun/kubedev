@@ -58,7 +58,7 @@ class KubedevConfig:
     )
 
   @staticmethod
-  def get_helm_set_env_args(kubedev: dict, env_accessor: object) -> dict:
+  def get_helm_set_env_args(kubedev: dict, env_accessor: object, cmdline_as_list: bool = False) -> dict:
     '''
     Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
     from a kubedev config.
@@ -66,15 +66,27 @@ class KubedevConfig:
     (envs, extraEnvs) = KubedevConfig.prepare_envs(KubedevConfig.get_all_envs(kubedev, False, True), env_accessor=env_accessor)
 
     if len(envs) > 0:
-      return {
-        'cmdline': ' ' + ' '.join([f'--set {name}="${{{attribs["targetName"]}}}"' for name, attribs in envs.items()]),
-        'envs': extraEnvs
-      }
+      if cmdline_as_list:
+        return {
+          'cmdline': [arg for arglist in [['--set', f'{name}="${{{attribs["targetName"]}}}"'] for name, attribs in envs.items()] for arg in arglist],
+          'envs': extraEnvs
+        }
+      else:
+        return {
+          'cmdline': ' ' + ' '.join([f'--set {name}="${{{attribs["targetName"]}}}"' for name, attribs in envs.items()]),
+          'envs': extraEnvs
+        }
     else:
-      return {
-        'cmdline': '',
-        'envs': dict()
-      }
+      if cmdline_as_list:
+        return {
+          'cmdline': [],
+          'envs': dict()
+        }
+      else:
+        return {
+          'cmdline': '',
+          'envs': dict()
+        }
 
   @staticmethod
   def get_kubeconfig_path(env_accessor, file_accessor):

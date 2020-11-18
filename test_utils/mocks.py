@@ -12,7 +12,7 @@ class ShellExecutorMock:
     self._cmd_output = cmd_output
 
   def execute(self, commandWithArgs, envVars=dict(), piped_input: str = None, check=False):
-    self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': envVars, 'withOutput': True})
+    self._calls.append({'cmd': [cmd for cmd in commandWithArgs if cmd is not None], 'env': envVars, 'withOutput': False, 'pipedInput': piped_input})
     return 0
 
   def get_output(self, commandWithArgs, envVars: dict = dict(), check=False):
