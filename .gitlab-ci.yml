@@ -1,0 +1,36 @@
+stages:
+- unit-test
+- release
+
+unit-test:
+  stage: unit-test
+  image: python:3.8-slim
+  before_script:
+  - pip install pipenv
+  - pipenv install --dev
+  script:
+  - python -m unittest discover
+
+release-dev:
+  stage: release
+  only:
+  - /^master$/
+  image: python:3.8-slim
+  before_script:
+  - pip install pipenv
+  - pipenv install --dev
+  script:
+  - python setup.py sdist bdist_wheel
+  - TWINE_PASSWORD="${DEVELOPMENT_TWINE_PASSWORD}" python -m twine upload --repository testpypi dist/*
+
+release-official:
+  stage: release
+  only:
+  - /^v.*$/
+  image: python:3.8-slim
+  before_script:
+  - pip install pipenv
+  - pipenv install --dev
+  script:
+  - python setup.py sdist bdist_wheel
+  - TWINE_PASSWORD="${PRODUCTION_TWINE_PASSWORD}" python -m twine upload dist/*
