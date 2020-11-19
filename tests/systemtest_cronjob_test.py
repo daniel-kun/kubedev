@@ -505,3 +505,45 @@ users:
                   "arguments",
                   "${SHELLVAR}"
             ])], [call['cmd'] for call in shellMock._calls])
+
+    def test_sytemtest_overwrites_required_envs_with_variables_when_deploying(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testCronJobConfig)
+        config['cronjobs']['foo-job']['systemTest']['variables'] = {
+            'FOO_SERVICE_GLOBAL_ENV1': 'overwritten!',
+            'FOO_SERVICE_JOB_ENV2': '${FOO_SERVICE_JOB_ENV2_OVERWRITE}'
+        }
+        result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        self.assertIn([
+            'docker',
+            'run',
+            '-i',
+            '--rm',
+            '--network',
+            'local-foo-job-system-tests-abcd',
+            '--volume',
+            '/kubedev/systemtests/.kubedev/kind_config_foo-service-abcd:/tmp/kube_config',
+            '--volume',
+            '/kubedev/systemtests/helm-chart/:/app/helm-chart/',
+            'alpine/helm:2.16.9',
+            'upgrade',
+            'local-foo-job-system-tests-abcd',
+            '/app/helm-chart/',
+            '--install',
+            '--wait',
+            '--kubeconfig',
+            '/tmp/kube_config',
+            '--set', 'KUBEDEV_TAG=abcd',
+            '--set', 'FOO_SERVICE_GLOBAL_ENV1="overwritten!"',
+            '--set', 'FOO_SERVICE_JOB_ENV1="${FOO_SERVICE_JOB_ENV1}"',
+            '--set', 'FOO_SERVICE_JOB_ENV2="${FOO_SERVICE_JOB_ENV2_OVERWRITE}"'
+            ], [call['cmd'] for call in shellMock._calls])

@@ -294,7 +294,7 @@ class KubeDevRunTests(unittest.TestCase):
       'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}" ' +
       './foo-deploy/'
     ])
-    self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', calls[0]['env'])
+    self.assertIn('${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}', calls[0]['env'])
     self.assertListEqual(calls[1]['cmd'], [
         '/bin/sh',
         '-c',
@@ -306,7 +306,7 @@ class KubeDevRunTests(unittest.TestCase):
         'FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}" ' +
         f'foo-registry/foo-service-foo-deploy:{mockTag}'
     ])
-    self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', calls[1]['env'])
+    self.assertIn('${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}', calls[1]['env'])
 
   def test_run_cronjob(self):
     envMock = EnvMock()

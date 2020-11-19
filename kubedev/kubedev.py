@@ -428,6 +428,7 @@ class Kubedev:
       tag: str,
       release_name: str,
       docker_network: str,
+      variable_overrides: dict,
       shell_executor: object,
       env_accessor: object,
       file_accessor: object,
@@ -435,7 +436,7 @@ class Kubedev:
     variables = KubedevConfig.get_global_variables(kubedev)
     if docker_network is not None:
       kubeContext = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
-      envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor, cmdline_as_list=True)
+      envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor, variable_overrides=variable_overrides, cmdline_as_list=True)
       command = [
           'docker',
           'run',
@@ -459,7 +460,7 @@ class Kubedev:
           ['--set', f'KUBEDEV_TAG={tag}'] + \
           envs['cmdline']
     else:
-      envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor, cmdline_as_list = False)
+      envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor, variable_overrides=variable_overrides, cmdline_as_list = False)
       command = [
           '/bin/sh',
           '-c',
@@ -497,7 +498,7 @@ class Kubedev:
     release_name = KubedevConfig.get_helm_release_name(kubedev)
     kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
     tag = KubedevConfig.get_tag(env_accessor)
-    return self._deploy(kubedev, kubeconfig, tag, release_name, None, shell_executor, env_accessor, file_accessor)
+    return self._deploy(kubedev, kubeconfig, tag, release_name, None, dict(), shell_executor, env_accessor, file_accessor)
 
   def _create_docker_config(self, file_accessor, env_accessor):
     envCi = env_accessor.getenv('CI')
@@ -1021,7 +1022,7 @@ class Kubedev:
             if not KubernetesTools.wait_for_deployment(tag, wslClusterConfig, "kube-system", "tiller-deploy", timeout, shell_executor, sleeper):
               print(f'{colorama.Fore.RED}Tiller deployment did not become ready within timeout of {timeout} seconds :-(')
               return False
-            if self._deploy(kubedev, clusterConfig, uuid, tag, tag, shell_executor, env_accessor, file_accessor) != 0:
+            if self._deploy(kubedev, clusterConfig, uuid, tag, tag, globalVariables, shell_executor, env_accessor, file_accessor) != 0:
               return False
 
           numSleepSeconds = 5
@@ -1046,7 +1047,7 @@ class Kubedev:
               "--name", f"{appName}-system-tests-{uuid}",
               "--interactive"] + \
               Kubedev._build_cluster_config_mounts(clusterConfig, file_accessor=file_accessor, shell_executor=shell_executor) + \
-              functools.reduce(operator.concat, [["--env", f'{envName}="${{{attribs["targetName"]}}}"'] for envName, attribs in filteredRequiredEnvs.items()], []) + \
+              functools.reduce(operator.concat, [["--env", f'{envName}="{attribs["targetName"]}"'] for envName, attribs in filteredRequiredEnvs.items()], []) + \
               functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
               [tag])]
           if shell_executor.execute(cmdRunSystemTests, envVars=additionalEnvs, check=False) == 0:

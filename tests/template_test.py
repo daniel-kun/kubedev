@@ -104,10 +104,10 @@ class KubeDevTemplateTests(unittest.TestCase):
         '--set FOO_SERVICE_GLOBAL_ENV1="${FOO_SERVICE_GLOBAL_ENV1}" --set FOO_SERVICE_GLOBAL_ENV2="${FOO_SERVICE_GLOBAL_ENV2}"' +
         ''
     ], helmTemplateCommand)
-    self.assertIn('FOO_DEPLOY_BINARY_VALUE_AS_BASE64', helmTemplateEnv)
-    self.assertIn('FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64', helmTemplateEnv)
-    self.assertEqual(helmTemplateEnv['FOO_DEPLOY_BINARY_VALUE_AS_BASE64'], b64encode(binaryValue.encode('utf-8')))
-    self.assertEqual(helmTemplateEnv['FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64'], b64encode((binaryValue + binaryValue).encode('utf-8')))
+    self.assertIn('${FOO_DEPLOY_BINARY_VALUE_AS_BASE64}', helmTemplateEnv)
+    self.assertIn('${FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64}', helmTemplateEnv)
+    self.assertEqual(helmTemplateEnv['${FOO_DEPLOY_BINARY_VALUE_AS_BASE64}'], b64encode(binaryValue.encode('utf-8')))
+    self.assertEqual(helmTemplateEnv['${FOO_DEPLOY_GLOBAL_BINARY_VALUE_AS_BASE64}'], b64encode((binaryValue + binaryValue).encode('utf-8')))
 
   def test_template_cronjob(self):
     # ARRANGE

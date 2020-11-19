@@ -475,7 +475,7 @@ class KubeDevSystemTestDeploymentTests(unittest.TestCase):
         ]
         self.assertIn(expectedCall, [call['cmd'] for call in shellMock._calls])
         dockerRunCallEnvs = [call['env'] for call in shellMock._calls if call['cmd'] == expectedCall][0]
-        self.assertIn('FOO_SERVICE_GLOBAL_ENV1_AS_BASE64', dockerRunCallEnvs)
+        self.assertIn('${FOO_SERVICE_GLOBAL_ENV1_AS_BASE64}', dockerRunCallEnvs)
 
     def test_systemtest_mounts_volumes_to_service_shorthand(self):
         fileMock = FileMock()

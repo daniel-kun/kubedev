@@ -47,9 +47,9 @@ class KubedevConfig:
 
     def env_name(name: str, attribs: dict) -> str:
       if 'transform' in attribs and attribs['transform'] == 'base64':
-        return f'{name}_AS_BASE64'
+        return f'${{{name}_AS_BASE64}}'
       else:
-        return name
+        return f'${{{name}}}'
 
     sortedEnvs = dict(sorted(envs.items()))
     return (
@@ -58,22 +58,27 @@ class KubedevConfig:
     )
 
   @staticmethod
-  def get_helm_set_env_args(kubedev: dict, env_accessor: object, cmdline_as_list: bool = False) -> dict:
+  def get_helm_set_env_args(kubedev: dict, env_accessor: object, variable_overrides: dict = dict(), cmdline_as_list: bool = False) -> dict:
     '''
     Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
     from a kubedev config.
     '''
     (envs, extraEnvs) = KubedevConfig.prepare_envs(KubedevConfig.get_all_envs(kubedev, False, True), env_accessor=env_accessor)
+    for var, value in variable_overrides.items():
+      if var in envs:
+        envs[var] = {
+          'targetName': value
+        }
 
     if len(envs) > 0:
       if cmdline_as_list:
         return {
-          'cmdline': [arg for arglist in [['--set', f'{name}="${{{attribs["targetName"]}}}"'] for name, attribs in envs.items()] for arg in arglist],
+          'cmdline': [arg for arglist in [['--set', f'{name}="{attribs["targetName"]}"'] for name, attribs in envs.items()] for arg in arglist],
           'envs': extraEnvs
         }
       else:
         return {
-          'cmdline': ' ' + ' '.join([f'--set {name}="${{{attribs["targetName"]}}}"' for name, attribs in envs.items()]),
+          'cmdline': ' ' + ' '.join([f'--set {name}="{attribs["targetName"]}"' for name, attribs in envs.items()]),
           'envs': extraEnvs
         }
     else:
@@ -184,7 +189,7 @@ class KubedevConfig:
     """
     (envs, extraEnvs) = KubedevConfig.prepare_envs(image['buildEnvs'], env_accessor=env_accessor)
     return (
-      " ".join([f'--build-arg {name}="${{{attribs["targetName"]}}}"' for name, attribs in sorted(envs.items())]) + " ",
+      " ".join([f'--build-arg {name}="{attribs["targetName"]}"' for name, attribs in sorted(envs.items())]) + " ",
       extraEnvs
     )
 
@@ -197,7 +202,7 @@ class KubedevConfig:
     """
     (envs, extraEnvs) = KubedevConfig.prepare_envs(image['containerEnvs'], env_accessor)
     return (
-      " ".join([f'--env {name}="${{{attribs["targetName"]}}}"' for name, attribs in sorted(envs.items())]) + " ",
+      " ".join([f'--env {name}="{attribs["targetName"]}"' for name, attribs in sorted(envs.items())]) + " ",
       extraEnvs
     )
 
