@@ -15,7 +15,7 @@ release-dev:
   stage: release
   only:
   - /^master$/
-  image: python:3.8-slim
+  image: python:3.6-slim
   before_script:
   - pip install pipenv
   - pipenv install --dev
@@ -27,7 +27,7 @@ release-official:
   stage: release
   only:
   - /^v.*$/
-  image: python:3.8-slim
+  image: python:3.6-slim
   before_script:
   - pip install pipenv
   - pipenv install --dev
