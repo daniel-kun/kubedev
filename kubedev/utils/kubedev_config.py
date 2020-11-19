@@ -32,7 +32,7 @@ class KubedevConfig:
   def get_all_app_definitions(kubedev: dict) -> dict:
     def if_exists(obj: dict, field: str) -> dict:
       if field in obj:
-        return obj[field]
+        return {key:{**value, 'type': field} for key, value in obj[field].items()}
       else:
         return dict()
 
@@ -58,7 +58,7 @@ class KubedevConfig:
     )
 
   @staticmethod
-  def get_helm_set_env_args(kubedev: dict, env_accessor: object) -> dict:
+  def get_helm_set_env_args(kubedev: dict, env_accessor: object, cmdline_as_list: bool = False) -> dict:
     '''
     Returns shell parameters for helm commands in the form of ``--set <variable>="${<variable>}" ...''
     from a kubedev config.
@@ -66,15 +66,27 @@ class KubedevConfig:
     (envs, extraEnvs) = KubedevConfig.prepare_envs(KubedevConfig.get_all_envs(kubedev, False, True), env_accessor=env_accessor)
 
     if len(envs) > 0:
-      return {
-        'cmdline': ' ' + ' '.join([f'--set {name}="${{{attribs["targetName"]}}}"' for name, attribs in envs.items()]),
-        'envs': extraEnvs
-      }
+      if cmdline_as_list:
+        return {
+          'cmdline': [arg for arglist in [['--set', f'{name}="${{{attribs["targetName"]}}}"'] for name, attribs in envs.items()] for arg in arglist],
+          'envs': extraEnvs
+        }
+      else:
+        return {
+          'cmdline': ' ' + ' '.join([f'--set {name}="${{{attribs["targetName"]}}}"' for name, attribs in envs.items()]),
+          'envs': extraEnvs
+        }
     else:
-      return {
-        'cmdline': '',
-        'envs': dict()
-      }
+      if cmdline_as_list:
+        return {
+          'cmdline': [],
+          'envs': dict()
+        }
+      else:
+        return {
+          'cmdline': '',
+          'envs': dict()
+        }
 
   @staticmethod
   def get_kubeconfig_path(env_accessor, file_accessor):
@@ -130,6 +142,7 @@ class KubedevConfig:
           images[deploymentKey] = {
               "imageName": f"{imageRegistry}/{finalDeploymentName}:{tag}",
               "imageNameTagless": f"{imageRegistry}/{finalDeploymentName}",
+              "appName": finalDeploymentName,
               "buildPath": KubedevConfig.get_buildpath(name, deploymentKey),
               "ports": deployment['ports'] if 'ports' in deployment else dict(),
               "buildEnvs": {**globalBuildEnvs, **KubedevConfig.load_envs(deployment, True, False)},
@@ -189,20 +202,22 @@ class KubedevConfig:
     )
 
   @staticmethod
+  def wsl_normalize(path: str, file_accessor: object, shell_executor: object) -> str:
+    procFile = file_accessor.load_file('/proc/version')
+    procVersion = procFile if procFile is not None else ""
+    if "Microsoft" in procVersion:
+      return shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n').replace('\\', '\\\\')
+    else:
+      return file_accessor.abspath(path)
+
+
+  @staticmethod
   def get_docker_run_volumes_list(image, file_accessor, shell_executor):
     """
     Returns a string with all "--volume ..." parameters to the "docker run ..." call.
 
     :param image: One entry returned from KubedevConfig.get_images()
     """
-    def create_and_normalize(path: str) -> str:
-      procFile = file_accessor.load_file('/proc/version')
-      procVersion = procFile if procFile is not None else ""
-      if "Microsoft" in procVersion:
-        return shell_executor.get_output(['wslpath', '-aw', path]).rstrip('\n').replace('\\', '\\\\')
-      else:
-        return file_accessor.abspath(path)
-
     def get_path(hostPath, containerPathSpec) -> str:
       if type(containerPathSpec) is dict:
         if 'path' in containerPathSpec:
@@ -210,19 +225,19 @@ class KubedevConfig:
           if 'content' in containerPathSpec:
             tempFilePath = os.path.join('.kubedev', f'temp_{hostPath}')
             file_accessor.save_file(tempFilePath, content=containerPathSpec['content'], overwrite=True)
-            effectiveHostPath = create_and_normalize(tempFilePath)
+            effectiveHostPath = KubedevConfig.wsl_normalize(tempFilePath, file_accessor=file_accessor, shell_executor=shell_executor)
           elif 'base64' in containerPathSpec:
             tempFilePath = os.path.join('.kubedev', f'temp_{hostPath}')
             file_accessor.save_file(tempFilePath, content=b64decode(containerPathSpec['base64']).decode('utf-8'), overwrite=True)
-            effectiveHostPath = create_and_normalize(os.path.join('.kubedev', f'temp_{hostPath}'))
+            effectiveHostPath = KubedevConfig.wsl_normalize(os.path.join('.kubedev', f'temp_{hostPath}'), file_accessor=file_accessor, shell_executor=shell_executor)
           else:
-            effectiveHostPath = create_and_normalize(hostPath)
+            effectiveHostPath = KubedevConfig.wsl_normalize(hostPath, file_accessor=file_accessor, shell_executor=shell_executor)
           suffix = ':ro' if 'readOnly' in containerPathSpec and containerPathSpec['readOnly'] == True else ''
           return f'{effectiveHostPath}:{path}{suffix}'
         else:
           raise Exception('Volume specification does not contain required "path" attribute')
       elif type(containerPathSpec) is str:
-        return f"{create_and_normalize(hostPath)}:{containerPathSpec}"
+        return f"{KubedevConfig.wsl_normalize(hostPath, file_accessor=file_accessor, shell_executor=shell_executor)}:{containerPathSpec}"
       else:
         raise Exception(f'Volume specification must either be a string, or an object with an "path" property, but is {type(containerPathSpec)} instead.')
 

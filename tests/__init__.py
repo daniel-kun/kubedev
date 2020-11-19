@@ -9,4 +9,6 @@ from .generate_dockerfiles_test import KubeDevGenerateDockerfiles
 from .generate_usedframeworks_test import KubeDevGenerateUsedFrameworks
 from .push_test import KubeDevPushTests
 from .run_test import KubeDevRunTests
+from .systemtest_cronjob_test import KubeDevSystemTestCronJobTests
+from .systemtest_deployment_test import KubeDevSystemTestDeploymentTests
 from .template_test import KubeDevTemplateTests

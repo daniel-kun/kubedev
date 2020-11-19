@@ -137,6 +137,25 @@ testCronJobConfig = {
                     "build": True,
                     "container": False
                 }
+            },
+            "systemTest": {
+                "variables": {
+                    "POSTGRES_USER": "testadmin",
+                },
+                "testContainer": {
+                    "buildArgs": {
+                        "FOO_JOB_BUILD_ARG": "asdf"
+                    }
+                },
+                "services": {
+                    "postgres:13": {
+                        "hostname": "postgres-test",
+                        "ports": [5432],
+                        "variables": {
+                            "POSTGRES_PASSWORD": "correct horse battery staple"
+                        }
+                    }
+                }
             }
         }
     }

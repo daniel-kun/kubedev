@@ -17,7 +17,7 @@ import pkg_resources
 import requests
 import yaml
 
-from kubedev.utils import KubedevConfig, YamlMerger
+from kubedev.utils import KubedevConfig, KubernetesTools, YamlMerger
 
 colorama.init(autoreset=True)
 
@@ -57,7 +57,7 @@ class RealFileAccessor:
     return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 class RealShellExecutor:
-  def execute(self, commandWithArgs: list, envVars: dict = dict(), piped_input: str = None, check=True):
+  def execute(self, commandWithArgs: list, envVars: dict = dict(), piped_input: str = None, check=True) -> int:
     """
     Execute a shell command.
 
@@ -112,7 +112,8 @@ class RealPrinter:
 
 class TagGenerator:
   def tag(self):
-    return str(uuid4()).replace('-', '')
+    s = str(uuid4())
+    return s[0:s.find('-')]
 
 def _load_template(file, variables, template_accessor):
   content = template_accessor.load_template(file)
@@ -420,19 +421,53 @@ class Kubedev:
     else:
       return shell_executor.get_output(command, {**variables, **envs['envs']})
 
-  def _deploy(self, kubedev, release_name, shell_executor, env_accessor, file_accessor, get_output=False):
+  def _deploy(
+      self,
+      kubedev: dict,
+      kubeconfig: str,
+      tag: str,
+      release_name: str,
+      docker_network: str,
+      shell_executor: object,
+      env_accessor: object,
+      file_accessor: object,
+      get_output: bool = False):
     variables = KubedevConfig.get_global_variables(kubedev)
-    tag = KubedevConfig.get_tag(env_accessor)
-    kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
-    envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor)
-    command = [
-        '/bin/sh',
-        '-c',
-        f'helm upgrade {release_name} ./helm-chart/ --install --wait ' +
-        f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
-        f'--set KUBEDEV_TAG="{tag}"' +
-        envs['cmdline']
-    ]
+    if docker_network is not None:
+      kubeContext = env_accessor.getenv('KUBEDEV_KUBECONTEXT')
+      envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor, cmdline_as_list=True)
+      command = [
+          'docker',
+          'run',
+          '-i',
+          '--rm',
+          '--network',
+          docker_network,
+          '--volume',
+          f'{KubedevConfig.wsl_normalize(kubeconfig, file_accessor, shell_executor)}:/tmp/kube_config',
+          '--volume',
+          f'{KubedevConfig.wsl_normalize("helm-chart/", file_accessor, shell_executor)}:/app/helm-chart/',
+          'alpine/helm:2.16.9',
+          'upgrade',
+          release_name,
+          '/app/helm-chart/',
+          '--install',
+          '--wait',
+          '--kubeconfig',
+          '/tmp/kube_config'] + \
+          (["--kube-context", kubeContext] if kubeContext != None else []) + \
+          ['--set', f'KUBEDEV_TAG={tag}'] + \
+          envs['cmdline']
+    else:
+      envs = KubedevConfig.get_helm_set_env_args(kubedev, env_accessor, cmdline_as_list = False)
+      command = [
+          '/bin/sh',
+          '-c',
+          f'helm upgrade {release_name} ./helm-chart/ --install --wait ' +
+          f'--kubeconfig {kubeconfig} {self._get_kubecontext_arg(env_accessor)} ' +
+          f'--set KUBEDEV_TAG="{tag}"' +
+          envs['cmdline']
+      ]
     if not get_output:
       return shell_executor.execute(command, {**variables, **envs['envs']})
     else:
@@ -460,7 +495,9 @@ class Kubedev:
 
   def deploy_from_config(self, kubedev, shell_executor, env_accessor, file_accessor):
     release_name = KubedevConfig.get_helm_release_name(kubedev)
-    return self._deploy(kubedev, release_name, shell_executor, env_accessor, file_accessor)
+    kubeconfig = KubedevConfig.get_kubeconfig_path(env_accessor, file_accessor)
+    tag = KubedevConfig.get_tag(env_accessor)
+    return self._deploy(kubedev, kubeconfig, tag, release_name, None, shell_executor, env_accessor, file_accessor)
 
   def _create_docker_config(self, file_accessor, env_accessor):
     envCi = env_accessor.getenv('CI')
@@ -505,6 +542,14 @@ class Kubedev:
       image = images[container]
       return self.build_from_image(image, force_tag, env_accessor, shell_executor)
 
+  def _push_image(self, image: str, shell_executor: object) -> int:
+      call = [
+          '/bin/sh',
+          '-c',
+          f"docker push {image}"
+      ]
+      return shell_executor.execute(call, dict())
+
   def push(self, configFileName, container, file_accessor=RealFileAccessor(), shell_executor=RealShellExecutor(), env_accessor=RealEnvAccessor()):
     return self.push_from_config(
         self._load_config(configFileName), container=container, file_accessor=file_accessor, shell_executor=shell_executor, env_accessor=env_accessor)
@@ -517,12 +562,7 @@ class Kubedev:
           f"Container {container} is not defined in kubedev config.")
     else:
       image = images[container]
-      call = [
-          '/bin/sh',
-          '-c',
-          f"docker push {image['imageName']}"
-      ]
-      return shell_executor.execute(call, dict())
+      return self._push_image(image['imageName'], shell_executor)
 
   def _load_polaris_config(self, kubedev, downloader, file_accessor, env_accessor) -> str:
     if not "securityChecks" in kubedev:
@@ -682,6 +722,13 @@ class Kubedev:
         ]
         return shell_executor.execute(command, envVars=extraEnvs, check=False)
 
+  @staticmethod
+  def _build_cluster_config_mounts(clusterConfig: str, file_accessor: object, shell_executor: object) -> list:
+    if clusterConfig != None:
+      return ["--volume", f"{KubedevConfig.wsl_normalize(clusterConfig, file_accessor, shell_executor)}:/tmp/kube_config", "--env", "KUBECONFIG=/tmp/kube_config"]
+    else:
+      return []
+
   def _run_docker_detached(
     self,
     network: str,
@@ -700,12 +747,26 @@ class Kubedev:
       """
       (imageDef, image, requiredEnvs, isFromKubedev) = Kubedev._build_image(rawImage, images)
       filteredRequiredEnvs = sorted([env for env in requiredEnvs if not env in variables]) # Note: the sorted() is important, otherwise the order would be
-      print(f'Running detached: {name} (image: {image})')
-      cmdRm = ["docker", "rm", "--force", name]
-      shell_executor.execute(cmdRm, check=False) # To be sure, first try to delete the container that we want to create
       if isFromKubedev and env_accessor.getenv('CI') is None:
         self.build_from_image(imageDef, "none", env_accessor, shell_executor)
       requiredEnvForwards = functools.reduce(operator.concat, [["--env", f'{envName}="${{{envName}}}"'] for envName in filteredRequiredEnvs], []) if isFromKubedev else []
+      return self._run_docker_detached_impl(
+        network,
+        name,
+        image,
+        KubedevConfig.get_docker_run_volumes_list(imageDef, file_accessor, shell_executor) + \
+        requiredEnvForwards + \
+        functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
+        functools.reduce(operator.concat, [["--publish", str(port)] for port in ports], []),
+        dict(),
+        shell_executor)
+
+
+  def _run_docker_detached_impl(self, network: str, name: str, image: str, additionalArgs: list, shellEnvs: dict, shell_executor: object):
+      print(f'Running detached: {name} (image: {image})')
+      cmdRm = ["docker", "rm", "--force", name]
+      shell_executor.execute(cmdRm, check=False) # To be sure, first try to delete the container that we want to create
+
       cmdCreate = [
         "/bin/sh",
         "-c",
@@ -715,12 +776,9 @@ class Kubedev:
           "--network", network,
           "--name", name,
           "--rm"] + \
-          KubedevConfig.get_docker_run_volumes_list(imageDef, file_accessor, shell_executor) + \
-          requiredEnvForwards + \
-          functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
-          functools.reduce(operator.concat, [["--publish", str(port)] for port in ports], []) + \
+          additionalArgs + \
           [image])]
-      dockerIdRaw = shell_executor.get_output(cmdCreate, check=False)
+      dockerIdRaw = shell_executor.get_output(cmdCreate, envVars=shellEnvs, check=False)
       print(f"> {dockerIdRaw}")
       if dockerIdRaw is None or dockerIdRaw == "":
           return (dockerIdRaw, name, False)
@@ -755,6 +813,17 @@ class Kubedev:
           return default
       else:
           return obj[field]
+
+  @staticmethod
+  def _rewrite_kubeconfig_to(file: str, host: str, port: int, file_accessor: object):
+    kubeConfFile = file_accessor.load_file(file)
+    if kubeConfFile != None:
+      kubeConf = yaml.safe_load(kubeConfFile)
+      for cluster in kubeConf['clusters']:
+        cluster['cluster']['server'] = f'https://{host}:{port}'
+      kubeConfNew = yaml.safe_dump(kubeConf)
+      file_accessor.save_file(file, kubeConfNew, overwrite=True)
+      return kubeConfNew
 
   def system_test(self,
                   configFileName: str,
@@ -811,6 +880,7 @@ class Kubedev:
       uuid = tag_generator.tag()
       tag = f"local-{appName}-system-tests-{uuid}"
       network = tag
+      appType = app['type']
       cmdBuild = [
         "/bin/sh",
         "-c",
@@ -822,16 +892,49 @@ class Kubedev:
           ] + functools.reduce(operator.concat, [["--build-args", f'{arg}="{value}"'] for arg, value in buildArgs.items()], []) + [containerDir])]
       if shell_executor.execute(cmdBuild, envVars=buildArgs, check=False) != 0:
           return False
+      # Step #1.1: For CronJobs: Build and push all apps
+      if appType == 'cronjobs':
+        for app in apps:
+          self.build_from_config(kubedev, appName, uuid, file_accessor, shell_executor, env_accessor)
+          self._push_image(f"{images[appName]['imageNameTagless']}:{uuid}", shell_executor)
 
-      # Step #2: Create the docker network
-      cmdNetworkCreate = ["docker", "network", "create", network]
-      if shell_executor.execute(cmdNetworkCreate, check=False) != 0:
-          return False
+      # Step #2: Create the docker network, or spin up a Kind cluster:
+      if appType == 'cronjobs':
+          file_accessor.mkdirhier('.kubedev')
+          serviceName = kubedev['name']
+          clusterName = f'kind-{serviceName}-{uuid}'
+          clusterConfig = f'.kubedev/kind_config_{serviceName}-{uuid}'
+
+          cmdKindCreateCluster = [
+              'kind',
+              'create',
+              'cluster',
+              '--kubeconfig',
+              clusterConfig,
+              '--wait',
+              '10m',
+              '--name',
+              clusterName
+          ]
+          additionalVars = {
+              'KIND_EXPERIMENTAL_DOCKER_NETWORK': network
+          }
+          # Spin up a new one-node Kubernetes-in-Docker cluster via `kind` (https://kind.sigs.k8s.io/)
+          if shell_executor.execute(cmdKindCreateCluster, additionalVars) != 0:
+            return False
+          clusterConfigContent = Kubedev._rewrite_kubeconfig_to(clusterConfig, f"{clusterName}-control-plane", 6443, file_accessor=file_accessor)
+      elif appType == 'deployments':
+          clusterConfig = None
+          cmdNetworkCreate = ["docker", "network", "create", network]
+          if shell_executor.execute(cmdNetworkCreate, check=False) != 0:
+              return False
+      else:
+          raise NotImplementedError(f"Can not run system tests for app type {appType}")
 
       result = False
       startedContainers = []
       try:
-          # Step #3: Start the service container
+          # Step #3: Start the service containers
           startedContainers = [
               self._run_docker_detached(
                   network,
@@ -843,11 +946,89 @@ class Kubedev:
                   env_accessor,
                   shell_executor,
                   file_accessor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
+          if appType == 'cronjobs':
+            runCronJobApiKey = tag_generator.tag()
+            # Add variables for the test container to access the kubedev-run-cronjob-api service:
+            variables = {
+              **variables,
+              "KUBEDEV_SYSTEMTEST_DAEMON_APIKEY": runCronJobApiKey,
+              "KUBEDEV_SYSTEMTEST_DAEMON_ENDPOINT": f"http://kubedev-run-cronjob-api:5000/execute"
+            }
+
+            # Step #3.1: For CronJobs: Start the 'kubedev-run-cronjob-api' service
+            startedContainers = startedContainers + [
+              self._run_docker_detached_impl(
+                network,
+                'kubedev-run-cronjob-api',
+                'danielkun/kubedev-systemtest-daemon:v0.01',
+                [
+                  "--env",
+                  f'KUBEDEV_SYSTEMTEST_DAEMON_APIKEY="{runCronJobApiKey}"',
+                  "--env",
+                  f'KUBEDEV_SYSTEMTEST_DAEMON_CRONJOB="{images[appName]["appName"]}"',
+                  "--env",
+                  'KUBEDEV_SYSTEMTEST_DAEMON_KUBECONFIG="${KUBEDEV_SYSTEMTEST_DAEMON_KUBECONFIG}"'
+                ],
+                {
+                  "KUBEDEV_SYSTEMTEST_DAEMON_KUBECONFIG": clusterConfigContent
+                },
+                shell_executor
+              )
+            ]
+            # Step #3.2: For CronJobs: Init helm, set docker registry secret and deploy this helm-chart
+            wslClusterConfig = KubedevConfig.wsl_normalize(clusterConfig, file_accessor, shell_executor)
+            if not KubernetesTools.apply(tag, wslClusterConfig, KubernetesTools.get_tiller_rbac_setup(), shell_executor):
+              return False
+
+            if KubernetesTools.kubectl(
+              tag,
+              wslClusterConfig,
+              {"DOCKER_AUTH_CONFIG"},
+              ["create",
+                "secret",
+                "generic",
+                kubedev['imagePullSecrets'],
+                "--type",
+                "kubernetes.io/dockerconfigjson",
+                '--from-literal=.dockerconfigjson="${DOCKER_AUTH_CONFIG}"'],
+              shell_executor) != 0:
+              return False
+
+            cmdHelmInit = [
+              'docker',
+              'run',
+              '-i',
+              '--rm',
+              '--network',
+              tag,
+              '--volume',
+              f'{wslClusterConfig}:/tmp/kube_config',
+              'alpine/helm:2.16.9',
+              '--kubeconfig',
+              '/tmp/kube_config',
+              'init',
+              '--service-account',
+              'tiller'
+            ]
+            if shell_executor.execute(cmdHelmInit, check=False) != 0:
+                return False
+            timeout = 600
+            print(f'{colorama.Fore.YELLOW}Waiting {timeout} seconds for Tiller deployment to become ready...')
+            if not KubernetesTools.wait_for_deployment(tag, wslClusterConfig, "kube-system", "tiller-deploy", timeout, shell_executor, sleeper):
+              print(f'{colorama.Fore.RED}Tiller deployment did not become ready within timeout of {timeout} seconds :-(')
+              return False
+            if self._deploy(kubedev, clusterConfig, uuid, tag, tag, shell_executor, env_accessor, file_accessor) != 0:
+              return False
 
           numSleepSeconds = 5
           print(f'{colorama.Fore.YELLOW}TODO: Sleeping for {numSleepSeconds} seconds instead of pinging the exposed ports')
           # Step #4: Wait for the services to become ready
           sleeper.sleep(numSleepSeconds)
+
+          print(f'{colorama.Fore.GREEN}======================================')
+          print(f'{colorama.Fore.GREEN}🚀🚀🚀 PREPARATION COMPLETED.')
+          print(f'{colorama.Fore.GREEN}🚀🚀🚀 SYSTEM TESTS ARE STARTING NOW:')
+          print(f'{colorama.Fore.GREEN}======================================')
 
           # Step #5: Run the system test container
           cmdRunSystemTests = [
@@ -860,6 +1041,7 @@ class Kubedev:
               "--network", network,
               "--name", f"{appName}-system-tests-{uuid}",
               "--interactive"] + \
+              Kubedev._build_cluster_config_mounts(clusterConfig, file_accessor=file_accessor, shell_executor=shell_executor) + \
               functools.reduce(operator.concat, [["--env", f'{envName}="${{{attribs["targetName"]}}}"'] for envName, attribs in filteredRequiredEnvs.items()], []) + \
               functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
               [tag])]
@@ -886,9 +1068,20 @@ class Kubedev:
                   # Cleanup #2: Remove the service containers
                   cmdRm = ["docker", "rm", "--force", containerId]
                   shell_executor.execute(cmdRm, check=False)
-          # Cleanup #2: Remove the docker network
+
+          # Cleanup #2: Remove the docker network / Kind cluster
+          if appType == 'cronjobs':
+              cmdKindDeleteCluster = [
+                  'kind',
+                  'delete',
+                  'cluster',
+                  '--name',
+                  clusterName
+              ]
+              shell_executor.execute(cmdKindDeleteCluster)
           cmdNetworkRm = ["docker", "network", "rm", tag]
           shell_executor.execute(cmdNetworkRm, check=False)
+
           if result:
               print()
               print(f'{colorama.Fore.GREEN}System tests succeeded! 🌟🎉🥳')

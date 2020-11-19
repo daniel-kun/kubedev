@@ -9,6 +9,7 @@ It builds on well-known and field-proven tools:
 - [docker](https://docker.com/)
 - [tilt](https://tilt.dev/)
 - [helm](https://helm.sh/)
+- [kind](https://kind.sigs.k8s.io/)
 - Security audits:
   - [Fairwinds Polaris](https://github.com/FairwindsOps/polaris)
 - CI providers:
@@ -140,18 +141,32 @@ Schema of kubedev.json:
         }
     },
     "cronjobs": {
-      "myjob": {
-        "volumes": {
-          "dev": {
-            "job_files/": "/tmp/job_files/"
-          }
-        },
-        "required-envs": {
-            "MYJOB_VAR": {
-                "documentation": "..."
+        "myjob": {
+            "volumes": {
+              "dev": {
+                  "job_files/": "/tmp/job_files/"
+              }
+            },
+            "required-envs": {
+                "MYJOB_VAR": {
+                    "documentation": "..."
+                }
+            },
+            "systemTests": {
+                # See the detailed documentation on system tests below.
+                "services": {
+                    # Services can use public images or images from your private repository, too:
+                    "postgres:13": {
+                        "hostname": "postgres-test",
+                        "ports": [5432], # Ports that are accessible from other containers
+                        "variables": {
+                            "POSTGRES_USER": "tempuser",
+                            "POSTGRES_PASSWORD": "correct horse battery staple"
+                        }
+                    }
+                }
             }
-        },
-      }
+        }
     }
 }
 ```
@@ -294,13 +309,15 @@ The generated image tag is passed to the template using the environment variable
 
 ## kubedev system-test \<app name\>
 
-Runs containerized system-tests for deployments.
+### System Tests for Deployments
 
-System-test container are run against defined services, which can either be services defined in `kubedev.json`, or services pulled from a registry such as a database or a service defined in another repository.
+If \<app-name\> is a deployment, the system-test is run in "deployment"-mode, which is different and much quicker than the "cronjob"-mode (see below).
+
+In "deployment"-mode, a system-test container is run against defined services, which can either be services defined in `kubedev.json`, or services pulled from a registry such as a database or a service defined in another repository. The system-test container and the services run directly in docker and not in Kubernetes.
 
 See [Automatic docker login](#automatic-docker-login)
 
-`kubedev system-test`'s behaviour is defined in a "systemTest" sub-element of the app definition. See the thorough example at the beginning of the README.md.
+`kubedev system-test`'s behaviour is defined in a "systemTest" sub-element of the deployment definition. See the thorough example at the beginning of the README.md.
 
 The following configuration options are available:
 
@@ -312,7 +329,7 @@ The following configuration options are available:
 |`systemTest.testContainer.services`|Defines services that are run in the background when running the system test container. Use the syntax `{\<app name\>` to reference deployments that are defined in this `kubedev.json`, and the image name will be built automatically according to the same rules are `kuebdev build` would. The app's `volumes.dev` are passed to the container as `kubedev run` does.|No|
 |`systemTest.testContainer.services[...].hostname`|This service will be available by this hostname from the system test container|Yes|
 |`systemTest.testContainer.services[...].ports`|Defines ports that are published from this service|No|
-|`systemTest.testContainer.services[...].variables`|Defines additional variables that are passed to this service. When this service references a kubedev deployment, additionally all `required-envs` for this deployment are passed into the service. These values can be overwritten using this variables.|No|
+|`systemTest.testContainer.services[...].variables`|Defines additional environment variables that are passed to this service. When this service references a kubedev deployment, additionally all `required-envs` for this deployment are passed into the service. These values can be overwritten using this variables.|No|
 
 The schematic flow when running the system-test is as follows:
 
@@ -325,3 +342,64 @@ The schematic flow when running the system-test is as follows:
 7. Remove the services containers.
 8. Remove the temporary docker network.
 
+### System Tests for CronJobs
+
+#### Introduction
+
+If \<app-name\> is a cronjob, the sytsem-test is run in "cronjob"-mode, which spins up a temporary Kubernetes cluster using `kind`.
+
+See [Automatic docker login](#automatic-docker-login)
+
+`kubedev system-test`'s behaviour is defined in a "systemTest" sub-element of the cronjob definition.
+
+#### Configuration
+
+The following configuration options are available:
+
+|Configuration element|Description|Mandatory|
+|---------------------|-----------|---------|
+|`systemTest.variables`|Defines global variables that are passed as environment variables into the services (if defined) and the system test container|No|
+|`systemTest.testContainer.variables`|Defines variables  that are passed as environment variables into the system test container, but not the services|No|
+|`systemTest.testContainer.buildArgs`|Defines build args that are used when building the system test container|No|
+|`systemTest.testContainer.services`|Defines services that are run outside of the cluster when running the system test container. This can not reference apps from the `kubedev.json`, because the whole service is deployed to the cluster and hence all apps run, anyways.|No|
+|`systemTest.testContainer.services[...].hostname`|This service will be available by this hostname from the system test container|Yes|
+|`systemTest.testContainer.services[...].ports`|Defines ports that are published from this service|No|
+|`systemTest.testContainer.services[...].variables`|Defines additional environment variables that are passed to this service.|No|
+
+#### Flow
+
+The schematic flow when running the system-test is as follows:
+
+1. Build the system test container from `./systemTests/\<app-name\>/`.
+2. Build and push all apps from `kubedev.json`.
+3. Spin up a new [kind](https://kind.sigs.k8s.io/) cluster.
+4. Run a [special service](https://github.com/daniel-kun/kubedev-systemtest-daemon) that can be used by the system-tests to easily start the CronJob. The API below.
+5. Cluster initialization: , install `tiller` using `helm init`
+- Create a `tiller` service-account with cluster-admin permissions
+- Run `helm init` to install tiller
+- Create the secret defined by `imagePullSecrets` with the content `.dockerconfigjson: <base64-encoded ${DOCKER_AUTH_CONFIG}`
+- Wait for `tiller` to become ready
+6. Deploy this service
+7. Run the system-test container
+
+#### Run the CronJob from within the system-test
+
+A convenience service is provided for the system-tests to easily start the CronJob and fetch the logs.
+
+Use this endpoint to trigger the endpoint:
+
+```
+POST http://${KUBEDEV_SYSTEMTEST_DAEMON_ENDPOINT}/execute
+
+Api-Key: ${KUBEDEV_SYSTEMTEST_DAEMON_APIKEY}
+```
+
+e.g. using curl you can use:
+
+```bash
+curl -X POST -H "Api-Key: ${KUBEDEV_SYSTEMTEST_DAEMON_APIKEY}" ${KUBEDEV_SYSTEMTEST_DAEMON_ENDPOINT}
+```
+
+The service will send individual lines, first consisting of the commands that it executes, and then with the log output of the CronJob.
+
+A system test case should be designed to first set up the environment - such as the database or whathever is required by the CronJob, then run the CronJob using this convenience service and afterwards either inspect the logs or check the environment for expected changes - such as a new or updated entry in the database.
