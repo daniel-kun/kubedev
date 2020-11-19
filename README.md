@@ -121,6 +121,7 @@ Schema of kubedev.json:
                     "{mydeploy}": {
                         "hostname": "myservice-test", # The system test container can access this service by this hostname
                         "ports": [8081], # Ports that are accessible from other containers
+                        "cmd": ["--some", "commandline", "--args", "${SHELL_EXPANDED_VARIABLE}"], # Arguments passed to 'docker run...' after the image-name
                         "variables": {
                             # Environment variables that are passed to this service.
                             # All required-envs for this deployment are passed, too, but can be overwritten here:
@@ -329,6 +330,7 @@ The following configuration options are available:
 |`systemTest.testContainer.services`|Defines services that are run in the background when running the system test container. Use the syntax `{\<app name\>` to reference deployments that are defined in this `kubedev.json`, and the image name will be built automatically according to the same rules are `kuebdev build` would. The app's `volumes.dev` are passed to the container as `kubedev run` does.|No|
 |`systemTest.testContainer.services[...].hostname`|This service will be available by this hostname from the system test container|Yes|
 |`systemTest.testContainer.services[...].ports`|Defines ports that are published from this service|No|
+|`systemTest.testContainer.services[...].cmd`|A list of command line arguments passed to the `docker run...` command.|No|
 |`systemTest.testContainer.services[...].variables`|Defines additional environment variables that are passed to this service. When this service references a kubedev deployment, additionally all `required-envs` for this deployment are passed into the service. These values can be overwritten using this variables.|No|
 
 The schematic flow when running the system-test is as follows:
@@ -364,6 +366,7 @@ The following configuration options are available:
 |`systemTest.testContainer.services`|Defines services that are run outside of the cluster when running the system test container. This can not reference apps from the `kubedev.json`, because the whole service is deployed to the cluster and hence all apps run, anyways.|No|
 |`systemTest.testContainer.services[...].hostname`|This service will be available by this hostname from the system test container|Yes|
 |`systemTest.testContainer.services[...].ports`|Defines ports that are published from this service|No|
+|`systemTest.testContainer.services[...].cmd`|A list of command line arguments passed to the `docker run...` command.|No|
 |`systemTest.testContainer.services[...].variables`|Defines additional environment variables that are passed to this service.|No|
 
 #### Flow

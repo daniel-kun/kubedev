@@ -737,6 +737,7 @@ class Kubedev:
     rawImage: str,
     images: dict,
     variables: dict,
+    cmd: list,
     env_accessor: object,
     shell_executor: object,
     file_accessor: object) -> (str, bool):
@@ -759,10 +760,11 @@ class Kubedev:
         functools.reduce(operator.concat, [["--env", f'{varName}="{varValue}"'] for varName, varValue in variables.items()], []) + \
         functools.reduce(operator.concat, [["--publish", str(port)] for port in ports], []),
         dict(),
+        cmd,
         shell_executor)
 
 
-  def _run_docker_detached_impl(self, network: str, name: str, image: str, additionalArgs: list, shellEnvs: dict, shell_executor: object):
+  def _run_docker_detached_impl(self, network: str, name: str, image: str, additionalArgs: list, shellEnvs: dict, cmd: list, shell_executor: object):
       print(f'Running detached: {name} (image: {image})')
       cmdRm = ["docker", "rm", "--force", name]
       shell_executor.execute(cmdRm, check=False) # To be sure, first try to delete the container that we want to create
@@ -777,7 +779,7 @@ class Kubedev:
           "--name", name,
           "--rm"] + \
           additionalArgs + \
-          [image])]
+          [image] + cmd)]
       dockerIdRaw = shell_executor.get_output(cmdCreate, envVars=shellEnvs, check=False)
       print(f"> {dockerIdRaw}")
       if dockerIdRaw is None or dockerIdRaw == "":
@@ -943,6 +945,7 @@ class Kubedev:
                   serviceKey,
                   images,
                   {**globalVariables, **self._field_optional(service, 'variables', dict())},
+                  self._field_optional(service, 'cmd', []),
                   env_accessor,
                   shell_executor,
                   file_accessor) for serviceKey, service in self._field_optional(systemTestDefinition, 'services', dict()).items()]
@@ -972,6 +975,7 @@ class Kubedev:
                 {
                   "KUBEDEV_SYSTEMTEST_DAEMON_KUBECONFIG": clusterConfigContent
                 },
+                [],
                 shell_executor
               )
             ]

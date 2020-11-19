@@ -189,6 +189,48 @@ class KubeDevSystemTestDeploymentTests(unittest.TestCase):
                   "postgres:13",
             ])], [call['cmd'] for call in shellMock._calls])
 
+    def test_systemtest_run_with_service_from_registry_with_cmd(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['docker_id_postgres'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testDeploymentConfig)
+        del config['deployments']['foo-deploy']['systemTest']['services']['{foo-deploy}']
+        config['deployments']['foo-deploy']['systemTest']['services']['postgres:13']['cmd'] = ['some', 'fancy', 'args']
+        result = sut.system_test_from_config(config, 'foo-deploy', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        self.assertIn([
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-deploy-system-tests-abcd",
+                  "--name",
+                  "postgres-test",
+                  "--rm",
+                  "--env",
+                  'FOO_DEPLOY_TEST_X="X"',
+                  "--env",
+                  'FOO_DEPLOY_TEST_Y="Y"',
+                  "--env",
+                  'POSTGRES_USER="tempuser"',
+                  "--env",
+                  'POSTGRES_PASSWORD="correct horse battery staple"',
+                  "--publish",
+                  "5432",
+                  "postgres:13",
+                  'some',
+                  'fancy',
+                  'args'
+            ])], [call['cmd'] for call in shellMock._calls])
+
     def test_systemtest_run_with_service_from_kubedev_locally(self):
         fileMock = FileMock()
         envMock = EnvMock()

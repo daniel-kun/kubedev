@@ -468,3 +468,40 @@ users:
             'rm',
             'local-foo-job-system-tests-abcd'
         ], [call['cmd'] for call in shellMock._calls])
+
+    def test_sytemtest_passes_args_to_services(self):
+        fileMock = FileMock()
+        envMock = EnvMock()
+        shellMock = ShellExecutorMock(cmd_output=['x', 'y', '{"status": {"availableReplicas": 1}}'])
+        tagMock = TagGeneratorMock(['abcd'])
+        sleeper = SleepMock()
+
+        sut = Kubedev()
+        config = copy.deepcopy(testCronJobConfig)
+        config['cronjobs']['foo-job']['systemTest']['services']['postgres:13']['cmd'] = ['fancy', 'arguments', '${SHELLVAR}']
+        result = sut.system_test_from_config(config, 'foo-job', fileMock, envMock, shellMock, tagMock, sleeper)
+
+        self.assertEqual(result, 0)
+
+        self.assertIn([
+            "/bin/sh",
+            "-c",
+            " ".join([
+                  "docker",
+                  "create",
+                  "--network",
+                  "local-foo-job-system-tests-abcd",
+                  "--name",
+                  "postgres-test",
+                  "--rm",
+                  "--env",
+                  'POSTGRES_USER="testadmin"',
+                  "--env",
+                  'POSTGRES_PASSWORD="correct horse battery staple"',
+                  "--publish",
+                  "5432",
+                  "postgres:13",
+                  "fancy",
+                  "arguments",
+                  "${SHELLVAR}"
+            ])], [call['cmd'] for call in shellMock._calls])
