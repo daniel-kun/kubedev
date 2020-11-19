@@ -960,7 +960,7 @@ class Kubedev:
               self._run_docker_detached_impl(
                 network,
                 'kubedev-run-cronjob-api',
-                'x',
+                'danielkun/kubedev-systemtest-daemon:v0.01',
                 [
                   "--env",
                   f'KUBEDEV_SYSTEMTEST_DAEMON_APIKEY="{runCronJobApiKey}"',
@@ -1024,6 +1024,11 @@ class Kubedev:
           print(f'{colorama.Fore.YELLOW}TODO: Sleeping for {numSleepSeconds} seconds instead of pinging the exposed ports')
           # Step #4: Wait for the services to become ready
           sleeper.sleep(numSleepSeconds)
+
+          print(f'{colorama.Fore.GREEN}======================================')
+          print(f'{colorama.Fore.GREEN}🚀🚀🚀 PREPARATION COMPLETED.')
+          print(f'{colorama.Fore.GREEN}🚀🚀🚀 SYSTEM TESTS ARE STARTING NOW:')
+          print(f'{colorama.Fore.GREEN}======================================')
 
           # Step #5: Run the system test container
           cmdRunSystemTests = [
