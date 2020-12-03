@@ -1,5 +1,0 @@
-apiVersion: v1
-appVersion: "1.0-{{ChartVersion}}"
-description: %%KUBEDEV_PROJECT_DESCRIPTION%%
-name: %%KUBEDEV_PROJECT_NAME%%
-version: 1.0.0
